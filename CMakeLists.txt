@@ -195,6 +195,16 @@ set(MIDI_GENGX_MUSIC_SOURCES
     Source/Music/CompositionConditionedSequenceNeuralTrainingService.cpp
     Source/Music/CompositionConditionedTrainingRunService.h
     Source/Music/CompositionConditionedTrainingRunService.cpp
+    Source/Music/CompositionComposerKnowledgeRepresentation.h
+    Source/Music/CompositionComposerKnowledgeRepresentation.cpp
+    Source/Music/CompositionGenreKnowledgeRepresentation.h
+    Source/Music/CompositionGenreKnowledgeRepresentation.cpp
+    Source/Music/CompositionSoundEngineeringKnowledgeRepresentation.h
+    Source/Music/CompositionSoundEngineeringKnowledgeRepresentation.cpp
+    Source/Music/CompositionKnowledgeTrainingDataset.h
+    Source/Music/CompositionKnowledgeTrainingDataset.cpp
+    Source/Music/CompositionKnowledgeTrainingDatasetArtifact.h
+    Source/Music/CompositionKnowledgeTrainingDatasetArtifact.cpp
     Source/Music/CompositionComposerKnowledgeSample.h
     Source/Music/CompositionComposerKnowledgeSample.cpp
     Source/Music/CompositionComposerKnowledgeCatalog.h
@@ -2883,4 +2893,84 @@ set_property(
 add_test(
     NAME MIDI_GenGX_PluginAIRuntimeEndToEndTests
     COMMAND MIDI_GenGX_PluginAIRuntimeEndToEndTests
+)
+
+# -------------------- Phase 116 composer knowledge representation --------------------
+add_executable(MIDI_GenGX_CompositionComposerKnowledgeRepresentationTests
+    Source/Tests/CompositionComposerKnowledgeRepresentationTests.cpp
+)
+
+target_include_directories(
+    MIDI_GenGX_CompositionComposerKnowledgeRepresentationTests
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/Source
+)
+
+target_link_libraries(
+    MIDI_GenGX_CompositionComposerKnowledgeRepresentationTests
+    PRIVATE
+        MIDI_GenGX_Music
+)
+
+set_property(
+    TARGET MIDI_GenGX_CompositionComposerKnowledgeRepresentationTests
+    PROPERTY
+        MSVC_RUNTIME_LIBRARY "MultiThreadedDebugDLL"
+)
+
+add_test(
+    NAME MIDI_GenGX_CompositionComposerKnowledgeRepresentationTests
+    COMMAND MIDI_GenGX_CompositionComposerKnowledgeRepresentationTests
+)
+
+add_executable(MIDI_GenGX_CompositionGenreKnowledgeRepresentationTests
+    Source/Tests/CompositionGenreKnowledgeRepresentationTests.cpp
+)
+
+target_link_libraries(MIDI_GenGX_CompositionGenreKnowledgeRepresentationTests
+    PRIVATE
+        MIDI_GenGX_Music
+        MIDI_GenGX_Domain
+)
+
+add_test(
+    NAME MIDI_GenGX_CompositionGenreKnowledgeRepresentationTests
+    COMMAND MIDI_GenGX_CompositionGenreKnowledgeRepresentationTests
+)
+
+
+add_executable(MIDI_GenGX_CompositionSoundEngineeringKnowledgeRepresentationTests
+    Source/Tests/CompositionSoundEngineeringKnowledgeRepresentationTests.cpp
+)
+
+target_link_libraries(MIDI_GenGX_CompositionSoundEngineeringKnowledgeRepresentationTests
+    PRIVATE
+        MIDI_GenGX_Music
+        MIDI_GenGX_Domain
+)
+
+add_test(
+    NAME MIDI_GenGX_CompositionSoundEngineeringKnowledgeRepresentationTests
+    COMMAND MIDI_GenGX_CompositionSoundEngineeringKnowledgeRepresentationTests
+)
+
+add_executable(MIDI_GenGX_CompositionKnowledgeTrainingDatasetTests
+    Source/Tests/CompositionKnowledgeTrainingDatasetTests.cpp
+)
+
+target_link_libraries(MIDI_GenGX_CompositionKnowledgeTrainingDatasetTests
+    PRIVATE
+        MIDI_GenGX_Music
+        MIDI_GenGX_Domain
+)
+
+set_property(
+    TARGET MIDI_GenGX_CompositionKnowledgeTrainingDatasetTests
+    PROPERTY
+        MSVC_RUNTIME_LIBRARY "MultiThreadedDebugDLL"
+)
+
+add_test(
+    NAME MIDI_GenGX_CompositionKnowledgeTrainingDatasetTests
+    COMMAND MIDI_GenGX_CompositionKnowledgeTrainingDatasetTests
 )
