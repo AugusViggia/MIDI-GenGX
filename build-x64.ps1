@@ -219,6 +219,10 @@ $TestCompositionMidiCorpusDirectoryLoader = Join-Path `
     $BuildDir `
     "MIDI_GenGX_CompositionMidiCorpusDirectoryLoaderTests.exe"
 
+$TestCompositionIntent = Join-Path `
+    $BuildDir `
+    "MIDI_GenGX_CompositionIntentTests.exe"
+
 $TestCompositionMidiTrainingPipeline = Join-Path `
     $BuildDir `
     "MIDI_GenGX_CompositionMidiTrainingPipelineTests.exe"
@@ -1365,6 +1369,26 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "COMPOSITION MIDI DATASET BUILDER TESTS PASSED" -ForegroundColor Green
+
+Write-Host "Building CompositionIntentTests..." -ForegroundColor Cyan
+
+cmake `
+    --build $BuildDir `
+    --target "MIDI_GenGX_CompositionIntentTests" `
+    --config Debug `
+    --parallel
+
+if ($LASTEXITCODE -ne 0) {
+    throw "CompositionIntentTests build failed."
+}
+
+& $TestCompositionIntent
+
+if ($LASTEXITCODE -ne 0) {
+    throw "CompositionIntentTests failed."
+}
+
+Write-Host "COMPOSITION INTENT TESTS PASSED" -ForegroundColor Green
 
 Write-Host "Building CompositionMidiCorpusDirectoryLoaderTests..." -ForegroundColor Cyan
 

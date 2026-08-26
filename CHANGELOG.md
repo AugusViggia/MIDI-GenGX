@@ -105,11 +105,13 @@
 - Added fail-closed invalid/null resource handling.
 - Added dedicated runtime loader tests.
 
-## Phase 114 — Composition Intent Schema
-- Added the first explicit `CompositionIntent` contract for the future Music Intelligence Engine.
-- Preserves existing `GenerationIntent` as the base for explicit musical context.
-- Adds composer influences, genre tags, structural intent, sound-engineering intent, and generation-duration intent.
-- Defines hard-constraint flags and an explicit soft-source priority ordering.
-- Encodes the AI complete-generation duration contract as 60–360 seconds.
-- Added dedicated `CompositionIntentTests`.
-- This phase defines the input contract only; no model training or runtime behavior is changed yet.
+## Phase 113 — Real Model Artifact Qualification
+- Added file-based qualification using the Phase 112 runtime loader.
+- Added inspection of persisted conditioning vocabulary.
+- Added fail-closed handling for missing model artifacts.
+- Documented the supplied 67-piece Chopin experiment as an existing development artifact.
+
+## Phase 114.1 — Composition Intent Build Integration
+- Preserved the Phase 113 real-model artifact inspector sources and test target in the CMake graph.
+- Added `CompositionIntentTests` using the existing project test-target conventions and `MultiThreadedDebugDLL` runtime.
+- No production runtime, training, model, corpus, UI, or CPU-budget behavior changed.

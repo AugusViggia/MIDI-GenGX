@@ -74,6 +74,8 @@ set(MIDI_GENGX_MUSIC_SOURCES
     Source/Music/CompositionTransitionProfile.cpp
     Source/Music/CompositionKnowledgeSnapshot.h
     Source/Music/CompositionKnowledgeSnapshot.cpp
+    Source/Music/CompositionKnowledgeRepresentation.h
+    Source/Music/CompositionKnowledgeRepresentation.cpp
     Source/Music/CompositionDatasetSample.h
     Source/Music/CompositionDatasetSample.cpp
     Source/Music/CompositionDataset.h
@@ -187,6 +189,8 @@ set(MIDI_GENGX_MUSIC_SOURCES
     Source/Music/CompositionConditionedSequenceNeuralModelArtifact.cpp
     Source/Music/CompositionConditionedSequenceNeuralModelRuntimeLoader.h
     Source/Music/CompositionConditionedSequenceNeuralModelRuntimeLoader.cpp
+    Source/Music/CompositionConditionedSequenceNeuralModelArtifactFileInspector.h
+    Source/Music/CompositionConditionedSequenceNeuralModelArtifactFileInspector.cpp
     Source/Music/CompositionConditionedSequenceNeuralTrainingService.h
     Source/Music/CompositionConditionedSequenceNeuralTrainingService.cpp
     Source/Music/CompositionConditionedTrainingRunService.h
@@ -713,6 +717,53 @@ set_property(
 add_test(
     NAME MIDI_GenGX_CompositionKnowledgeSnapshotTests
     COMMAND MIDI_GenGX_CompositionKnowledgeSnapshotTests
+)
+
+# -------------------- Composition knowledge representation tests --------------------
+add_executable(MIDI_GenGX_CompositionKnowledgeRepresentationTests
+    Source/Tests/CompositionKnowledgeRepresentationTests.cpp
+)
+
+target_include_directories(
+    MIDI_GenGX_CompositionKnowledgeRepresentationTests
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/Source
+)
+
+# Keep the standalone knowledge-representation test link independent of the
+# caller's Visual Studio shell environment. The main build script uses the
+# same toolchain locations; these directories provide the MSVC/UCRT libraries
+# when the incremental target is built directly from a normal PowerShell.
+set(MIDI_GENGX_MSVC_14_51_LIB_DIR
+    "C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/14.51.36231/lib/x64")
+set(MIDI_GENGX_WINDOWS_UM_LIB_DIR
+    "C:/Program Files (x86)/Windows Kits/10/Lib/10.0.26100.0/um/x64")
+set(MIDI_GENGX_WINDOWS_UCRT_LIB_DIR
+    "C:/Program Files (x86)/Windows Kits/10/Lib/10.0.26100.0/ucrt/x64")
+
+target_link_directories(
+    MIDI_GenGX_CompositionKnowledgeRepresentationTests
+    PRIVATE
+        "${MIDI_GENGX_MSVC_14_51_LIB_DIR}"
+        "${MIDI_GENGX_WINDOWS_UM_LIB_DIR}"
+        "${MIDI_GENGX_WINDOWS_UCRT_LIB_DIR}"
+)
+
+target_link_libraries(
+    MIDI_GenGX_CompositionKnowledgeRepresentationTests
+    PRIVATE
+        MIDI_GenGX_Music
+)
+
+set_property(
+    TARGET MIDI_GenGX_CompositionKnowledgeRepresentationTests
+    PROPERTY
+        MSVC_RUNTIME_LIBRARY "MultiThreadedDebugDLL"
+)
+
+add_test(
+    NAME MIDI_GenGX_CompositionKnowledgeRepresentationTests
+    COMMAND MIDI_GenGX_CompositionKnowledgeRepresentationTests
 )
 
 # -------------------- Composition dataset sample tests --------------------
@@ -1555,7 +1606,7 @@ add_test(
     COMMAND MIDI_GenGX_CompositionMidiDatasetBuilderTests
 )
 
-# -------------------- MIDI corpus directory loader tests --------------------
+# -------------------- Composition intent tests --------------------
 add_executable(MIDI_GenGX_CompositionIntentTests
     Source/Tests/CompositionIntentTests.cpp
 )
@@ -1570,11 +1621,18 @@ target_include_directories(MIDI_GenGX_CompositionIntentTests
         ${CMAKE_CURRENT_SOURCE_DIR}/Source
 )
 
+set_property(
+    TARGET MIDI_GenGX_CompositionIntentTests
+    PROPERTY
+        MSVC_RUNTIME_LIBRARY "MultiThreadedDebugDLL"
+)
+
 add_test(
     NAME MIDI_GenGX_CompositionIntentTests
     COMMAND MIDI_GenGX_CompositionIntentTests
 )
 
+# -------------------- MIDI corpus directory loader tests --------------------
 add_executable(MIDI_GenGX_CompositionMidiCorpusDirectoryLoaderTests
     Source/Tests/CompositionMidiCorpusDirectoryLoaderTests.cpp
 )
@@ -2465,6 +2523,34 @@ set_property(
 add_test(
     NAME MIDI_GenGX_CompositionConditionedSequenceNeuralModelRuntimeLoaderTests
     COMMAND MIDI_GenGX_CompositionConditionedSequenceNeuralModelRuntimeLoaderTests
+)
+
+# -------------------- Phase 113 real model artifact inspector --------------------
+add_executable(MIDI_GenGX_CompositionConditionedSequenceNeuralModelArtifactFileInspectorTests
+    Source/Tests/CompositionConditionedSequenceNeuralModelArtifactFileInspectorTests.cpp
+)
+
+target_include_directories(
+    MIDI_GenGX_CompositionConditionedSequenceNeuralModelArtifactFileInspectorTests
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/Source
+)
+
+target_link_libraries(
+    MIDI_GenGX_CompositionConditionedSequenceNeuralModelArtifactFileInspectorTests
+    PRIVATE
+        MIDI_GenGX_Music
+)
+
+set_property(
+    TARGET MIDI_GenGX_CompositionConditionedSequenceNeuralModelArtifactFileInspectorTests
+    PROPERTY
+        MSVC_RUNTIME_LIBRARY "MultiThreadedDebugDLL"
+)
+
+add_test(
+    NAME MIDI_GenGX_CompositionConditionedSequenceNeuralModelArtifactFileInspectorTests
+    COMMAND MIDI_GenGX_CompositionConditionedSequenceNeuralModelArtifactFileInspectorTests
 )
 
 # -------------------- Composition AI model runtime provider tests --------------------
