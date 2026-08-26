@@ -2,12 +2,16 @@
 #include "../Domain/AbletonOctaveConvention.h"
 
 #include <cmath>
+#if JUCE_WINDOWS
+ #include <windows.h>
+#endif
+
 
 namespace
 {
 constexpr float kMinUiZoom = 0.75f;
 constexpr float kMaxUiZoom = 1.50f;
-constexpr int kPopupRowHeight = 28;
+constexpr int kPopupRowHeight = 29;
 
 constexpr int keyFirstId = 1;
 constexpr int scaleFirstId = 101;
@@ -21,30 +25,206 @@ Popup::Popup(DownwardSelector& selectorToUse)
     : selector(selectorToUse)
 {
     setOpaque(true);
+
+    addAndMakeVisible(
+        verticalScrollBar);
+
+    verticalScrollBar.addListener(
+        this);
+
+    verticalScrollBar.setAutoHide(
+        true);
+
+    verticalScrollBar.setRangeLimits(
+        0.0,
+        0.0);
 }
 
 void MIDIGenGXAudioProcessorEditor::DownwardSelector::
 Popup::paint(juce::Graphics& g)
 {
-    g.fillAll(juce::Colour(0xff26323a));
+    g.fillAll(
+        juce::Colour(0xff26323a));
 
-    g.setColour(juce::Colour(0xff4b5961));
-    g.drawRect(getLocalBounds(), 1);
+    g.setColour(
+        juce::Colour(0xff4b5961));
+
+    g.drawRect(
+        getLocalBounds(),
+        1);
 }
 
 void MIDIGenGXAudioProcessorEditor::DownwardSelector::
 Popup::resized()
 {
-    constexpr int rowHeight = kPopupRowHeight;
+    constexpr int rowHeight =
+        kPopupRowHeight;
+
+    const bool needsScroll =
+        buttons.size() > 4;
+
+    const int scrollbarWidth =
+        needsScroll ? 12 : 0;
+
+    verticalScrollBar.setVisible(
+        needsScroll);
+
+    const int contentWidth =
+        juce::jmax(
+            1,
+            getWidth() -
+                scrollbarWidth -
+                2);
+
+    const int visibleHeight =
+        juce::jmax(
+            1,
+            getHeight() - 2);
+
+    contentHeight =
+        buttons.size() * rowHeight + 2;
+
+    const int maxScroll =
+        juce::jmax(
+            0,
+            contentHeight -
+                visibleHeight);
+
+    scrollOffset =
+        juce::jlimit(
+            0,
+            maxScroll,
+            scrollOffset);
+
+    verticalScrollBar.setBounds(
+        getWidth() - 12,
+        1,
+        11,
+        visibleHeight);
+
+    if (needsScroll)
+    {
+        verticalScrollBar.setRangeLimits(
+            0.0,
+            static_cast<double>(
+                contentHeight));
+
+        verticalScrollBar.setCurrentRange(
+            static_cast<double>(
+                scrollOffset),
+            static_cast<double>(
+                visibleHeight),
+            juce::dontSendNotification);
+    }
+    else
+    {
+        scrollOffset = 0;
+
+        verticalScrollBar.setRangeLimits(
+            0.0,
+            0.0);
+
+        verticalScrollBar.setCurrentRange(
+            0.0,
+            static_cast<double>(
+                visibleHeight),
+            juce::dontSendNotification);
+    }
 
     for (int i = 0; i < buttons.size(); ++i)
     {
+        const int y =
+            1 +
+            i * rowHeight -
+            scrollOffset;
+
         buttons[i]->setBounds(
             1,
-            1 + i * rowHeight,
-            getWidth() - 2,
+            y,
+            contentWidth,
             rowHeight);
     }
+}
+
+void MIDIGenGXAudioProcessorEditor::DownwardSelector::
+Popup::mouseWheelMove(
+    const juce::MouseEvent&,
+    const juce::MouseWheelDetails& wheel)
+{
+    if (contentHeight <= getHeight())
+        return;
+
+    const int maxScroll =
+        juce::jmax(
+            0,
+            contentHeight -
+                getHeight() +
+                2);
+
+    const int delta =
+        juce::roundToInt(
+            wheel.deltaY *
+            static_cast<float>(
+                kPopupRowHeight * 1.5f));
+
+    scrollOffset =
+        juce::jlimit(
+            0,
+            maxScroll,
+            scrollOffset - delta);
+
+    verticalScrollBar.setCurrentRangeStart(
+        static_cast<double>(
+            scrollOffset),
+        juce::dontSendNotification);
+
+    resized();
+}
+
+void MIDIGenGXAudioProcessorEditor::DownwardSelector::
+Popup::scrollBarMoved(
+    juce::ScrollBar* scrollBar,
+    double newRangeStart)
+{
+    if (scrollBar !=
+        &verticalScrollBar)
+        return;
+
+    scrollOffset =
+        juce::jlimit(
+            0,
+            juce::jmax(
+                0,
+                contentHeight -
+                    getHeight() +
+                    2),
+            juce::roundToInt(
+                newRangeStart));
+
+    resized();
+}
+
+void MIDIGenGXAudioProcessorEditor::DownwardSelector::
+Popup::setContentHeight(
+    int height)
+{
+    contentHeight =
+        juce::jmax(
+            0,
+            height);
+
+    resized();
+}
+
+bool MIDIGenGXAudioProcessorEditor::DownwardSelector::
+Popup::containsComponent(
+    const juce::Component* component) const noexcept
+{
+    if (component == nullptr)
+        return false;
+
+    return component == this ||
+           isParentOf(component);
 }
 
 void MIDIGenGXAudioProcessorEditor::DownwardSelector::
@@ -242,8 +422,18 @@ showPopup()
     popup->setAlwaysOnTop(true);
 
     constexpr int rowHeight = kPopupRowHeight;
-    const int popupHeight =
+    constexpr int maxVisibleRows = 4;
+
+    const int contentHeight =
         items.size() * rowHeight + 2;
+
+    const int maxPopupHeight =
+        maxVisibleRows * rowHeight + 2;
+
+    const int popupHeight =
+        juce::jmin(
+            contentHeight,
+            maxPopupHeight);
 
     // IMPORTANT:
     // This is a CHILD of the plugin editor. It is placed directly below
@@ -272,7 +462,9 @@ showPopup()
     const int finalHeight =
         juce::jmin(
             popupHeight,
-            juce::jmax(1, availableHeight));
+            juce::jmax(
+                kPopupRowHeight + 2,
+                availableHeight));
 
     popup->setBounds(
         popupX,
@@ -311,6 +503,8 @@ showPopup()
         popup.get());
 
     popup->toFront(true);
+    popup->setContentHeight(
+        contentHeight);
     popup->resized();
     popup->repaint();
 }
@@ -342,13 +536,22 @@ MIDIGenGXAudioProcessorEditor(
       octaveShiftBox(*this, {}),
       noteLengthBox(*this, {}),
       phraseContourBox(*this, {}),
-      cadenceStyleBox(*this, {})
+      cadenceStyleBox(*this, {}),
+      generationCpuModeBox(*this, {
+          "Low (2 cores)",
+          "Balanced (4 cores)",
+          "High (6 cores)",
+          "Pro (8 cores)"
+      })
 {
     constexpr int baseWidth = 820;
-    constexpr int baseHeight = 750;
+    constexpr int baseHeight = 860;
 
     setSize(baseWidth, baseHeight);
     setResizable(false, false);
+
+    juce::Desktop::getInstance().addGlobalMouseListener(
+        this);
 
     titleLabel.setText(
         "MIDI-GenGX",
@@ -537,7 +740,8 @@ MIDIGenGXAudioProcessorEditor(
         "Note Length", "Phrase Contour", "Cadence",
         "Density", "Variation", "Complexity", "Syncopation",
         "Tension", "Repetition", "Humanize",
-        "Length Variation", "Cadence Strength"
+        "Length Variation", "Cadence Strength",
+        "CPU Mode"
     };
 
     for (int i = 0; i < static_cast<int>(infoButtons.size()); ++i)
@@ -747,6 +951,21 @@ MIDIGenGXAudioProcessorEditor(
         }
     };
 
+    generationCpuLabel.setText(
+        "CPU MODE",
+        juce::dontSendNotification);
+
+    styleLabel(
+        generationCpuLabel,
+        10.0f,
+        juce::Colour(0xff8d8d8d),
+        juce::Justification::centredLeft);
+
+    addAndMakeVisible(
+        generationCpuLabel);
+addAndMakeVisible(
+        generationCpuModeBox);
+
     generatorButton.onClick = [this]()
     {
         closeInfoPopup();
@@ -779,23 +998,7 @@ MIDIGenGXAudioProcessorEditor(
     };
 
     addAndMakeVisible(generatorButton);
-
-    addAndMakeVisible(aiModelButton);
-    aiModelButton.setClickingTogglesState(false);
-    aiModelButton.setColour(
-        juce::TextButton::buttonColourId,
-        juce::Colour(0xff26323a));
-    aiModelButton.setColour(
-        juce::TextButton::textColourOffId,
-        juce::Colours::white);
-    aiModelButton.onClick =
-        [this]()
-        {
-            closeInfoPopup();
-            showAIModelFileChooser();
-        };
-
-    addAndMakeVisible(aiGenerateButton);
+addAndMakeVisible(aiGenerateButton);
     aiGenerateButton.setClickingTogglesState(false);
     aiGenerateButton.setColour(
         juce::TextButton::buttonColourId,
@@ -834,6 +1037,8 @@ MIDIGenGXAudioProcessorEditor(
 
     addAndMakeVisible(aiStatusLabel);
 
+    configureGenerationCpuMode();
+
     statusLabel.setJustificationType(
         juce::Justification::centred);
 
@@ -846,10 +1051,26 @@ MIDIGenGXAudioProcessorEditor(
     syncControlsFromProcessor();
 }
 
+
+bool MIDIGenGXAudioProcessorEditor::DownwardSelector::
+containsPopupComponent(
+    const juce::Component* component) const noexcept
+{
+    return popup != nullptr &&
+           popup->containsComponent(
+               component);
+}
+
 MIDIGenGXAudioProcessorEditor::
 ~MIDIGenGXAudioProcessorEditor()
 {
+    juce::Desktop::getInstance().removeGlobalMouseListener(
+        this);
+
     closeSelectorPopups();
+    closeInfoPopup();
+
+    activeCpuWarningOverlay.reset();
 }
 
 void MIDIGenGXAudioProcessorEditor::closeSelectorPopups()
@@ -968,6 +1189,317 @@ juce::String MIDIGenGXAudioProcessorEditor::roleName(
     }
 }
 
+
+
+#if JUCE_WINDOWS
+static int getDetectedLogicalProcessorCount() noexcept
+{
+    const auto count =
+        GetActiveProcessorCount(ALL_PROCESSOR_GROUPS);
+
+    return static_cast<int>(
+        juce::jmax(
+            DWORD(1),
+            count));
+}
+#endif
+
+MIDIGenGXAudioProcessorEditor::CpuWarningOverlay::
+CpuWarningOverlay(
+    MIDIGenGXAudioProcessorEditor& editor,
+    const juce::String& title,
+    const juce::String& message,
+    std::function<void(bool)> callback)
+    : owner(editor),
+      decisionCallback(std::move(callback))
+{
+    setOpaque(false);
+    setWantsKeyboardFocus(true);
+
+    titleLabel.setText(
+        title,
+        juce::dontSendNotification);
+    titleLabel.setFont(
+        juce::FontOptions(
+            18.0f,
+            juce::Font::bold));
+    titleLabel.setColour(
+        juce::Label::textColourId,
+        juce::Colours::white);
+    titleLabel.setJustificationType(
+        juce::Justification::centredLeft);
+    titleLabel.setInterceptsMouseClicks(
+        false,
+        false);
+
+    messageLabel.setText(
+        message,
+        juce::dontSendNotification);
+    messageLabel.setFont(
+        juce::FontOptions(
+            13.0f,
+            juce::Font::plain));
+    messageLabel.setColour(
+        juce::Label::textColourId,
+        juce::Colour(0xffe4e8ea));
+    messageLabel.setJustificationType(
+        juce::Justification::centredLeft);
+    messageLabel.setInterceptsMouseClicks(
+        false,
+        false);
+
+    scanResultLabel.setColour(
+        juce::Label::textColourId,
+        juce::Colour(0xffaeb7bc));
+    scanResultLabel.setFont(
+        juce::FontOptions(11.0f));
+    scanResultLabel.setJustificationType(
+        juce::Justification::centredLeft);
+    scanResultLabel.setText(
+        "System capability not scanned.",
+        juce::dontSendNotification);
+    scanResultLabel.setInterceptsMouseClicks(
+        false,
+        false);
+
+    addAndMakeVisible(
+        scanResultLabel);
+
+    for (auto* button : {
+             &scanButton,
+             &cancelButton,
+             &continueButton })
+    {
+        button->setClickingTogglesState(false);
+        button->setColour(
+            juce::TextButton::buttonColourId,
+            juce::Colour(0xff26323a));
+        button->setColour(
+            juce::TextButton::textColourOffId,
+            juce::Colours::white);
+        button->setColour(
+            juce::TextButton::buttonOnColourId,
+            juce::Colour(0xff34444e));
+
+        addAndMakeVisible(*button);
+    }
+
+    addAndMakeVisible(titleLabel);
+    addAndMakeVisible(messageLabel);
+
+    cancelButton.onClick =
+        [this]()
+        {
+            if (decisionCallback)
+                decisionCallback(false);
+        };
+
+    continueButton.onClick =
+        [this]()
+        {
+            if (decisionCallback)
+                decisionCallback(true);
+        };
+
+    scanButton.onClick =
+        [this]()
+        {
+            scanCpuCapability();
+        };
+
+    addKeyListener(nullptr);
+    grabKeyboardFocus();
+}
+
+void MIDIGenGXAudioProcessorEditor::CpuWarningOverlay::
+scanCpuCapability()
+{
+#if JUCE_WINDOWS
+    const int logicalProcessors =
+        getDetectedLogicalProcessorCount();
+
+    const auto recommended =
+        logicalProcessors >= 8
+            ? "Pro"
+            : logicalProcessors >= 6
+                ? "High"
+                : logicalProcessors >= 4
+                    ? "Balanced"
+                    : "Low";
+
+    scanResultLabel.setText(
+        "Detected " +
+            juce::String(logicalProcessors) +
+            " logical CPU threads. Recommended mode: " +
+            recommended +
+            ".",
+        juce::dontSendNotification);
+
+    cpuScanComplete = true;
+#else
+    scanResultLabel.setText(
+        "CPU capability scan is available on Windows only.",
+        juce::dontSendNotification);
+
+    cpuScanComplete = true;
+#endif
+
+    scanButton.setButtonText(
+        cpuScanComplete
+            ? "RESCAN SYSTEM"
+            : "SCAN SYSTEM");
+}
+
+void MIDIGenGXAudioProcessorEditor::CpuWarningOverlay::
+paint(juce::Graphics& g)
+{
+    g.fillAll(
+        juce::Colour(0x99000000));
+
+    auto dialogBounds =
+        getLocalBounds().reduced(32, 140);
+
+    const int dialogWidth =
+        juce::jmin(
+            560,
+            dialogBounds.getWidth());
+
+    const int dialogHeight =
+        juce::jmin(
+            255,
+            dialogBounds.getHeight());
+
+    dialogBounds.setSize(
+        dialogWidth,
+        dialogHeight);
+    dialogBounds.setCentre(
+        getLocalBounds().getCentre());
+
+    g.setColour(
+        juce::Colour(0xff26323a));
+    g.fillRoundedRectangle(
+        dialogBounds.toFloat(),
+        8.0f);
+
+    g.setColour(
+        juce::Colour(0xff59666d));
+    g.drawRoundedRectangle(
+        dialogBounds.toFloat().reduced(0.5f),
+        8.0f,
+        1.0f);
+
+    // Compact warning marker.
+    const auto marker =
+        juce::Rectangle<float>(
+            static_cast<float>(dialogBounds.getX() + 20),
+            static_cast<float>(dialogBounds.getY() + 23),
+            8.0f,
+            42.0f);
+
+    g.setColour(
+        juce::Colour(0xffd06a3a));
+    g.fillRoundedRectangle(
+        marker,
+        2.0f);
+
+    g.fillEllipse(
+        marker.getCentreX() - 3.0f,
+        marker.getBottom() + 8.0f,
+        6.0f,
+        6.0f);
+}
+
+void MIDIGenGXAudioProcessorEditor::CpuWarningOverlay::
+resized()
+{
+    auto dialogBounds =
+        getLocalBounds().reduced(32, 140);
+
+    const int dialogWidth =
+        juce::jmin(
+            560,
+            dialogBounds.getWidth());
+
+    const int dialogHeight =
+        juce::jmin(
+            255,
+            dialogBounds.getHeight());
+
+    dialogBounds.setSize(
+        dialogWidth,
+        dialogHeight);
+    dialogBounds.setCentre(
+        getLocalBounds().getCentre());
+
+    constexpr int padding = 20;
+
+    titleLabel.setBounds(
+        dialogBounds.getX() + padding + 20,
+        dialogBounds.getY() + 18,
+        dialogBounds.getWidth() - 2 * padding - 20,
+        28);
+
+    messageLabel.setBounds(
+        dialogBounds.getX() + padding + 20,
+        dialogBounds.getY() + 56,
+        dialogBounds.getWidth() - 2 * padding - 20,
+        82);
+
+    scanResultLabel.setBounds(
+        dialogBounds.getX() + padding + 20,
+        dialogBounds.getY() + 140,
+        dialogBounds.getWidth() - 2 * padding - 20,
+        22);
+
+    const int buttonWidth = 112;
+    const int buttonHeight = 34;
+    const int gap = 8;
+
+    scanButton.setBounds(
+        dialogBounds.getX() + padding + 20,
+        dialogBounds.getBottom() - padding - buttonHeight,
+        buttonWidth,
+        buttonHeight);
+
+    continueButton.setBounds(
+        dialogBounds.getRight() - padding - buttonWidth,
+        dialogBounds.getBottom() - padding - buttonHeight,
+        buttonWidth,
+        buttonHeight);
+
+    cancelButton.setBounds(
+        dialogBounds.getRight() -
+            padding -
+            buttonWidth -
+            gap -
+            buttonWidth,
+        dialogBounds.getBottom() - padding - buttonHeight,
+        buttonWidth,
+        buttonHeight);
+}
+
+bool MIDIGenGXAudioProcessorEditor::CpuWarningOverlay::
+keyPressed(const juce::KeyPress& key)
+{
+    if (key == juce::KeyPress::escapeKey)
+    {
+        if (decisionCallback)
+            decisionCallback(false);
+
+        return true;
+    }
+
+    if (key == juce::KeyPress::returnKey)
+    {
+        if (decisionCallback)
+            decisionCallback(true);
+
+        return true;
+    }
+
+    return false;
+}
+
 MIDIGenGXAudioProcessorEditor::InfoPopup::
 InfoPopup(float scale)
 {
@@ -1060,44 +1592,153 @@ resized()
         getHeight() - 14);
 }
 
-void MIDIGenGXAudioProcessorEditor::showAIModelFileChooser()
+
+void MIDIGenGXAudioProcessorEditor::configureGenerationCpuMode()
 {
-    auto chooser =
-        std::make_shared<juce::FileChooser>(
-            "Load MIDI-GenGX AI model",
-            juce::File{},
-            "*.mgnx");
+    generationCpuMode =
+        GenerationCpuMode::low;
 
-    const int flags =
-        juce::FileBrowserComponent::openMode |
-        juce::FileBrowserComponent::canSelectFiles;
+    previousGenerationCpuModeIndex =
+        0;
 
-    chooser->launchAsync(
-        flags,
-        [this, chooser](const juce::FileChooser& fileChooser)
+    generationCpuModeBox.setSelectedIndex(
+        0,
+        false);
+
+    generationCpuModeBox.onChange =
+        [this](int selectedIndex)
         {
-            const auto file =
-                fileChooser.getResult();
+            const int previousIndex =
+                previousGenerationCpuModeIndex;
 
-            if (!file.existsAsFile())
+            const auto requestedMode =
+                static_cast<GenerationCpuMode>(
+                    juce::jlimit(
+                        0,
+                        3,
+                        selectedIndex));
+
+            const bool requiresWarning =
+                requestedMode ==
+                    GenerationCpuMode::high ||
+                requestedMode ==
+                    GenerationCpuMode::pro;
+
+            if (!requiresWarning)
+            {
+                generationCpuMode =
+                    requestedMode;
+
+                previousGenerationCpuModeIndex =
+                    selectedIndex;
+
                 return;
-
-            if (audioProcessor.loadAIRuntimeModelFromFile(
-                    file))
-            {
-                aiStatusLabel.setText(
-                    "AI MODEL READY",
-                    juce::dontSendNotification);
-            }
-            else
-            {
-                aiStatusLabel.setText(
-                    "INVALID AI MODEL",
-                    juce::dontSendNotification);
             }
 
-            updateAIControls();
-        });
+            generationCpuModeBox.setSelectedIndex(
+                previousIndex,
+                false);
+
+            showHighCpuWarning(
+                requestedMode,
+                selectedIndex,
+                previousIndex);
+        };
+}
+
+void MIDIGenGXAudioProcessorEditor::showHighCpuWarning(
+    GenerationCpuMode requestedMode,
+    int requestedIndex,
+    int previousIndex)
+{
+    const bool isPro =
+        requestedMode ==
+        GenerationCpuMode::pro;
+
+    const juce::String title =
+        isPro
+            ? "PRO CPU MODE"
+            : "HIGH CPU MODE";
+
+    const juce::String body =
+        isPro
+            ? "MIDI-GenGX may use up to 8 CPU cores during generation.\n\n"
+              "This mode is intended for high-performance systems. "
+              "High CPU usage may cause audio dropouts, increased latency, "
+              "freezes, or reduced performance in Ableton Live or other "
+              "applications if your system cannot sustain the workload.\n\n"
+              "Continue with Pro Mode?"
+            : "MIDI-GenGX may use up to 6 CPU cores during generation.\n\n"
+              "This can significantly increase CPU usage and may affect "
+              "Ableton Live, virtual instruments, or other plugins on systems "
+              "with limited processing capacity.\n\n"
+              "Continue with High Mode?";
+
+    closeInfoPopup();
+    closeSelectorPopups();
+
+    juce::Component::SafePointer<
+        MIDIGenGXAudioProcessorEditor> safeThis(this);
+
+    activeCpuWarningOverlay =
+        std::make_unique<CpuWarningOverlay>(
+            *this,
+            title,
+            body,
+            [safeThis,
+             requestedMode,
+             requestedIndex,
+             previousIndex](
+                bool confirmed)
+            {
+                if (safeThis == nullptr)
+                    return;
+
+                auto& editor =
+                    *safeThis;
+
+                if (confirmed)
+                {
+                    editor.generationCpuMode =
+                        requestedMode;
+
+                    editor.previousGenerationCpuModeIndex =
+                        requestedIndex;
+
+                    editor.generationCpuModeBox.setSelectedIndex(
+                        requestedIndex,
+                        false);
+                }
+                else
+                {
+                    editor.generationCpuMode =
+                        static_cast<GenerationCpuMode>(
+                            juce::jlimit(
+                                0,
+                                3,
+                                previousIndex));
+
+                    editor.previousGenerationCpuModeIndex =
+                        previousIndex;
+
+                    editor.generationCpuModeBox.setSelectedIndex(
+                        previousIndex,
+                        false);
+                }
+
+                editor.activeCpuWarningOverlay.reset();
+                editor.repaint();
+            });
+
+    addAndMakeVisible(
+        *activeCpuWarningOverlay);
+
+    activeCpuWarningOverlay->toFront(true);
+    activeCpuWarningOverlay->setBounds(
+        getLocalBounds());
+    activeCpuWarningOverlay->resized();
+    activeCpuWarningOverlay->grabKeyboardFocus();
+    activeCpuWarningOverlay->repaint();
 }
 
 void MIDIGenGXAudioProcessorEditor::updateAIControls()
@@ -1108,18 +1749,13 @@ void MIDIGenGXAudioProcessorEditor::updateAIControls()
     const bool aiEnabled =
         audioProcessor.isAIRuntimeEnabled();
 
-    aiModelButton.setButtonText(
-        modelLoaded
-            ? "AI MODEL READY"
-            : "LOAD AI MODEL");
-
     aiGenerateButton.setEnabled(
         modelLoaded);
 
     if (!modelLoaded)
     {
         aiStatusLabel.setText(
-            "NO AI MODEL",
+            "AI MODEL NOT EMBEDDED",
             juce::dontSendNotification);
     }
     else if (aiEnabled)
@@ -1131,7 +1767,7 @@ void MIDIGenGXAudioProcessorEditor::updateAIControls()
     else
     {
         aiStatusLabel.setText(
-            "MODEL LOADED",
+            "AI MODEL READY",
             juce::dontSendNotification);
     }
 }
@@ -1161,7 +1797,10 @@ void MIDIGenGXAudioProcessorEditor::showInfoPopup(
         "Strength of motif repetition.",
         "Subtle timing and velocity variation.",
         "Variation applied to note durations.",
-        "Strength of phrase-final resolution."
+        "Strength of phrase-final resolution.",
+        "CPU processing budget used during generation. Low uses 2 cores, "
+        "Balanced uses 4, High uses 6, and Pro uses 8. Higher modes can "
+        "increase CPU usage and may affect system performance."
     };
 
     constexpr int count =
@@ -1628,10 +2267,10 @@ void MIDIGenGXAudioProcessorEditor::pushContextToProcessor()
     audioProcessor.setLengthBars(lengths[lengthIndex]);
 
     audioProcessor.setOctaveLow(
-        std::min(lowOctave, highOctave));
+        juce::jmin(lowOctave, highOctave));
 
     audioProcessor.setOctaveHigh(
-        std::max(lowOctave, highOctave));
+        juce::jmax(lowOctave, highOctave));
 
     audioProcessor.setOctaveShift(
         octaveRegisterShift);
@@ -1675,13 +2314,13 @@ void MIDIGenGXAudioProcessorEditor::paint(
     juce::Graphics& g)
 {
     constexpr int baseWidth = 820;
-    constexpr int baseHeight = 750;
+    constexpr int baseHeight = 820;
 
     const float scale =
         juce::jlimit(
             0.50f,
             2.00f,
-            std::min(
+            juce::jmin(
                 static_cast<float>(getWidth()) /
                     static_cast<float>(baseWidth),
                 static_cast<float>(getHeight()) /
@@ -1804,7 +2443,7 @@ void MIDIGenGXAudioProcessorEditor::setUiZoom(float zoom)
     closeSelectorPopups();
 
     constexpr int baseWidth = 820;
-    constexpr int baseHeight = 750;
+    constexpr int baseHeight = 820;
 
     setSize(
         juce::roundToInt(
@@ -1816,13 +2455,13 @@ void MIDIGenGXAudioProcessorEditor::setUiZoom(float zoom)
 void MIDIGenGXAudioProcessorEditor::resized()
 {
     constexpr int baseWidth = 820;
-    constexpr int baseHeight = 750;
+    constexpr int baseHeight = 820;
 
     const float scale =
         juce::jlimit(
             0.50f,
             2.00f,
-            std::min(
+            juce::jmin(
                 static_cast<float>(getWidth()) /
                     static_cast<float>(baseWidth),
                 static_cast<float>(getHeight()) /
@@ -2059,9 +2698,13 @@ void MIDIGenGXAudioProcessorEditor::resized()
 
     // Generation actions.
     const int actionGap = S(10);
-    const int actionY = S(650);
+    const int actionY = S(670);
     const int actionH = S(42);
     const int sideButtonWidth = S(150);
+    const int cpuControlWidth =
+        noteLengthBox.getWidth();
+    const int cpuControlX =
+        noteLengthBox.getX();
     const int mainButtonWidth = S(230);
 
     generatorButton.setBounds(
@@ -2070,13 +2713,28 @@ void MIDIGenGXAudioProcessorEditor::resized()
         mainButtonWidth,
         actionH);
 
-    aiModelButton.setBounds(
-        S(56),
+    generationCpuModeBox.setBounds(
+        cpuControlX,
         actionY,
-        sideButtonWidth,
+        cpuControlWidth,
         actionH);
 
-    aiGenerateButton.setBounds(
+    generationCpuLabel.setBounds(
+        cpuControlX,
+        actionY - S(18),
+        cpuControlWidth - S(24),
+        S(16));
+
+    {
+        const auto b =
+            generationCpuLabel.getBounds();
+
+        infoButtons[20].setBounds(
+            b.getRight() + S(3),
+            b.getY() - S(1),
+            S(18), S(18));
+    }
+aiGenerateButton.setBounds(
         getWidth() - S(56) - sideButtonWidth,
         actionY,
         sideButtonWidth,
@@ -2095,7 +2753,7 @@ void MIDIGenGXAudioProcessorEditor::resized()
 
     statusLabel.setBounds(
         S(60),
-        S(716),
+        S(736),
         getWidth() - S(120),
         S(18));
 
@@ -2103,19 +2761,73 @@ void MIDIGenGXAudioProcessorEditor::resized()
         juce::FontOptions(
             12.0f * scale,
             juce::Font::plain));
+    if (activeCpuWarningOverlay)
+    {
+        activeCpuWarningOverlay->setBounds(
+            getLocalBounds());
+        activeCpuWarningOverlay->resized();
+    }
 }
-
-
 
 void MIDIGenGXAudioProcessorEditor::mouseDown(
     const juce::MouseEvent& event)
 {
-    juce::ignoreUnused(event);
+    const auto* eventComponent =
+        event.eventComponent;
 
-    // Clicking anywhere in the editor closes any open selector before the
-    // newly clicked control gets a chance to open its own popup. This enforces
-    // a single-open-selector UX.
+    // Do not dismiss a popup when the click belongs to:
+    // - a selector itself (it manages its own open/close state),
+    // - one of the ? help buttons,
+    // - a selector dropdown/scrollbar,
+    // - the in-editor CPU warning overlay.
+    if (dynamic_cast<const DownwardSelector*>(
+            eventComponent) != nullptr)
+        return;
+
+    for (const auto& button : infoButtons)
+    {
+        if (&button == eventComponent ||
+            button.isParentOf(eventComponent))
+            return;
+    }
+
+    const DownwardSelector* selectors[] =
+    {
+        &genreBox,
+        &keyBox,
+        &scaleBox,
+        &roleBox,
+        &lengthBox,
+        &octaveLowBox,
+        &octaveHighBox,
+        &octaveShiftBox,
+        &noteLengthBox,
+        &phraseContourBox,
+        &cadenceStyleBox,
+        &generationCpuModeBox
+    };
+
+    for (const auto* selector : selectors)
+    {
+        if (selector == eventComponent ||
+            selector->isParentOf(eventComponent) ||
+            selector->containsPopupComponent(
+                eventComponent))
+            return;
+    }
+
+    if (activeInfoPopup != nullptr &&
+        activeInfoPopup->isParentOf(
+            eventComponent))
+        return;
+
+    if (activeCpuWarningOverlay != nullptr &&
+        activeCpuWarningOverlay->isParentOf(
+            eventComponent))
+        return;
+
     closeSelectorPopups();
+    closeInfoPopup();
 }
 
 bool MIDIGenGXAudioProcessorEditor::keyPressed(

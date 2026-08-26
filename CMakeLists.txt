@@ -30,6 +30,7 @@ set(MIDI_GENGX_DOMAIN_SOURCES
     Source/Domain/GenrePresets.h
     Source/Domain/GenrePresets.cpp
     Source/Domain/GenerationIntent.h
+    Source/Domain/CompositionIntent.h
     Source/Domain/AbletonOctaveConvention.h
 )
 
@@ -1555,6 +1556,25 @@ add_test(
 )
 
 # -------------------- MIDI corpus directory loader tests --------------------
+add_executable(MIDI_GenGX_CompositionIntentTests
+    Source/Tests/CompositionIntentTests.cpp
+)
+
+target_link_libraries(MIDI_GenGX_CompositionIntentTests
+    PRIVATE
+        MIDI_GenGX_Domain
+)
+
+target_include_directories(MIDI_GenGX_CompositionIntentTests
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/Source
+)
+
+add_test(
+    NAME MIDI_GenGX_CompositionIntentTests
+    COMMAND MIDI_GenGX_CompositionIntentTests
+)
+
 add_executable(MIDI_GenGX_CompositionMidiCorpusDirectoryLoaderTests
     Source/Tests/CompositionMidiCorpusDirectoryLoaderTests.cpp
 )

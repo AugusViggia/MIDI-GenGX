@@ -104,3 +104,12 @@
 - Preserves stored conditioning vocabulary identities.
 - Added fail-closed invalid/null resource handling.
 - Added dedicated runtime loader tests.
+
+## Phase 114 — Composition Intent Schema
+- Added the first explicit `CompositionIntent` contract for the future Music Intelligence Engine.
+- Preserves existing `GenerationIntent` as the base for explicit musical context.
+- Adds composer influences, genre tags, structural intent, sound-engineering intent, and generation-duration intent.
+- Defines hard-constraint flags and an explicit soft-source priority ordering.
+- Encodes the AI complete-generation duration contract as 60–360 seconds.
+- Added dedicated `CompositionIntentTests`.
+- This phase defines the input contract only; no model training or runtime behavior is changed yet.

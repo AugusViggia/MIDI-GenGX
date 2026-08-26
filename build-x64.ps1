@@ -303,6 +303,10 @@ $TestCompositionRealComposerCorpusPreparation = Join-Path `
     $BuildDir `
     "MIDI_GenGX_CompositionRealComposerCorpusPreparationTests.exe"
 
+$TestCompositionConditionedSequenceNeuralModelArtifactFileInspector = Join-Path `
+    $BuildDir `
+    "MIDI_GenGX_CompositionConditionedSequenceNeuralModelArtifactFileInspectorTests.exe"
+
 $TestCompositionConditionedSequenceNeuralModelRuntimeLoader = Join-Path `
     $BuildDir `
     "MIDI_GenGX_CompositionConditionedSequenceNeuralModelRuntimeLoaderTests.exe"
@@ -1861,6 +1865,27 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "COMPOSITION CONDITIONED SEQUENCE NEURAL MODEL RUNTIME LOADER TESTS PASSED" -ForegroundColor Green
+
+Write-Host "Building CompositionConditionedSequenceNeuralModelArtifactFileInspectorTests..." -ForegroundColor Cyan
+
+cmake `
+    --build $BuildDir `
+    --target "MIDI_GenGX_CompositionConditionedSequenceNeuralModelArtifactFileInspectorTests" `
+    --config Debug `
+    --parallel
+
+if ($LASTEXITCODE -ne 0) {
+    throw "CompositionConditionedSequenceNeuralModelArtifactFileInspectorTests build failed."
+}
+
+& $TestCompositionConditionedSequenceNeuralModelArtifactFileInspector
+
+if ($LASTEXITCODE -ne 0) {
+    throw "CompositionConditionedSequenceNeuralModelArtifactFileInspectorTests failed."
+}
+
+Write-Host "COMPOSITION CONDITIONED SEQUENCE NEURAL MODEL ARTIFACT FILE INSPECTOR TESTS PASSED" -ForegroundColor Green
+
 
 
 

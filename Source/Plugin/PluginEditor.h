@@ -29,6 +29,8 @@ private:
         std::function<void(int)> onChange;
         void setUiScale(float scale);
         void hidePopup(bool notify = false);
+        bool containsPopupComponent(
+            const juce::Component* component) const noexcept;
 
     private:
         MIDIGenGXAudioProcessorEditor& owner;
@@ -39,7 +41,9 @@ private:
         juce::Label textLabel;
         juce::TextButton arrowButton;
 
-        class Popup : public juce::Component
+        class Popup
+            : public juce::Component,
+              private juce::ScrollBar::Listener
         {
         public:
             Popup(DownwardSelector& selector);
@@ -47,9 +51,27 @@ private:
             void paint(juce::Graphics&) override;
             void resized() override;
             void mouseDown(const juce::MouseEvent&) override;
+            void mouseWheelMove(
+                const juce::MouseEvent&,
+                const juce::MouseWheelDetails&) override;
+
+            void setContentHeight(int height);
+            bool containsComponent(
+                const juce::Component* component) const noexcept;
 
             DownwardSelector& selector;
             juce::OwnedArray<juce::TextButton> buttons;
+
+        private:
+            void scrollBarMoved(
+                juce::ScrollBar*,
+                double newRangeStart) override;
+
+            juce::ScrollBar verticalScrollBar{ true };
+            int contentHeight = 0;
+            int scrollOffset = 0;
+
+            JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Popup)
         };
 
         std::unique_ptr<Popup> popup;
@@ -61,6 +83,38 @@ private:
     };
 
 private:
+    class CpuWarningOverlay : public juce::Component
+    {
+    public:
+        CpuWarningOverlay(
+            MIDIGenGXAudioProcessorEditor& owner,
+            const juce::String& title,
+            const juce::String& message,
+            std::function<void(bool)> decisionCallback);
+
+        void paint(juce::Graphics&) override;
+        void resized() override;
+        bool keyPressed(const juce::KeyPress&) override;
+
+        void scanCpuCapability();
+
+    private:
+        MIDIGenGXAudioProcessorEditor& owner;
+        std::function<void(bool)> decisionCallback;
+        juce::Label titleLabel;
+        juce::Label messageLabel;
+        juce::TextButton scanButton{ "SCAN SYSTEM" };
+        juce::TextButton cancelButton{ "CANCEL" };
+        juce::TextButton continueButton{ "CONTINUE" };
+
+        juce::Label scanResultLabel;
+
+        bool cpuScanComplete = false;
+
+        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(
+            CpuWarningOverlay)
+    };
+
     class InfoPopup : public juce::Component
     {
     public:
@@ -176,19 +230,39 @@ private:
 
     juce::Label statusLabel;
 
-    std::array<juce::TextButton, 20> infoButtons;
+    std::array<juce::TextButton, 21> infoButtons;
     std::unique_ptr<InfoPopup> activeInfoPopup;
+    std::unique_ptr<CpuWarningOverlay> activeCpuWarningOverlay;
 
     juce::TextButton settingsButton{
         "SETTINGS"
     };
 
-    juce::TextButton generatorButton{
-        "START GENERATION"
+    enum class GenerationCpuMode
+    {
+        low = 0,
+        balanced,
+        high,
+        pro
     };
 
-    juce::TextButton aiModelButton{
-        "LOAD AI MODEL"
+    void configureGenerationCpuMode();
+    void showHighCpuWarning(
+        GenerationCpuMode requestedMode,
+        int requestedIndex,
+        int previousIndex);
+
+    juce::Label generationCpuLabel;
+    DownwardSelector generationCpuModeBox;
+
+    GenerationCpuMode generationCpuMode =
+        GenerationCpuMode::low;
+
+    int previousGenerationCpuModeIndex =
+        0;
+
+    juce::TextButton generatorButton{
+        "START GENERATION"
     };
 
     juce::TextButton aiGenerateButton{
