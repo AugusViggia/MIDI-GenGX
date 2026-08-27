@@ -224,9 +224,9 @@ buildCompositionMidiTrainingSequence(
         CompositionMidiSectionHarmony fallbackHarmony;
 
         const auto* harmonic =
-            harmony.isValid() &&
             sectionIndex <
-                harmony.sections.size()
+                harmony.sections.size() &&
+            harmony.sections[sectionIndex].isValid()
                 ? &harmony.sections[
                     sectionIndex]
                 : &fallbackHarmony;

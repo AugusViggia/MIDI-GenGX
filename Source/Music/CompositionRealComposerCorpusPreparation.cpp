@@ -91,9 +91,10 @@ prepareRealComposerCorpusFromRecords(
                 record,
                 sections);
 
-        // Harmony is part of the current 20D event representation
-        // (scale degree, quality and harmonic confidence), so it is a hard
-        // prerequisite for the current neural training contract.
+        // A globally valid key and a section-aligned harmony analysis are
+        // required. An individual section may legitimately have Unknown
+        // harmony; the training representation has explicit fallback values
+        // for that uncertainty and should not discard the whole composition.
         //
         // Motif analysis is deliberately computed and passed through the
         // sequence-building boundary, but its current 20D representation does
@@ -101,7 +102,9 @@ prepareRealComposerCorpusFromRecords(
         // failure must not discard an otherwise valid musical sample. This
         // keeps the real-corpus gate aligned with the information the model
         // actually consumes today.
-        if (!harmony.isValid())
+        if (!harmony.key.isValid() ||
+            harmony.sections.size() !=
+                sections.sections.size())
         {
             ++result.rejectedSampleCount;
             continue;

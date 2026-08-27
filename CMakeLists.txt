@@ -2420,7 +2420,7 @@ target_link_libraries(
 set_property(
     TARGET MIDI_GenGX_CompositionRealComposerTrainingCli
     PROPERTY
-        MSVC_RUNTIME_LIBRARY "MultiThreadedDebugDLL"
+        MSVC_RUNTIME_LIBRARY "MultiThreadedDLL"
 )
 
 # -------------------- Phase 109 metadata loader tests --------------------
