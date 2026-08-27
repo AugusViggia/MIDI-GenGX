@@ -313,6 +313,65 @@ void testSectionMetricsPropagate()
         "density/velocity changes propagate into tension");
 }
 
+void testShortTerminalSectionIsAccepted()
+{
+    auto record =
+        buildRecord();
+
+    record.lengthTicks =
+        17 * 480;
+
+    record.notes.clear();
+
+    for (int index = 0;
+         index < 17;
+         ++index)
+    {
+        const auto start =
+            static_cast<std::uint32_t>(
+                index * 480);
+
+        record.notes.push_back(
+        {
+            0,
+            static_cast<std::uint8_t>(
+                60 + index % 5),
+            90,
+            start,
+            start + 240
+        });
+    }
+
+    const auto analysis =
+        analyzeCompositionMidiSections(
+            record);
+
+    expect(
+        analysis.isValid(
+            record.ticksPerQuarterNote),
+        "short terminal section remains valid");
+
+    expect(
+        analysis.sectionCount() == 2,
+        "17-quarter-note fixture produces a terminal section");
+
+    expect(
+        analysis.sections.back().role ==
+            PhraseSection::Cadence,
+        "short terminal section is cadence");
+
+    const auto terminalLengthBeats =
+        static_cast<double>(
+            analysis.sections.back().endTick -
+            analysis.sections.back().startTick) /
+        static_cast<double>(
+            record.ticksPerQuarterNote);
+
+    expect(
+        terminalLengthBeats == 1.0,
+        "terminal section preserves its one-beat duration");
+}
+
 void testInvalidRecordIsRejected()
 {
     CompositionMidiCorpusRecord invalid;
@@ -335,6 +394,7 @@ int main()
     testSectionBoundariesAreContiguous();
     testEmptySectionIsNotCreated();
     testSectionMetricsPropagate();
+    testShortTerminalSectionIsAccepted();
     testInvalidRecordIsRejected();
 
     std::cout

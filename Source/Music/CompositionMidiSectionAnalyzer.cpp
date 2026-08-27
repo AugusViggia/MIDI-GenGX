@@ -11,6 +11,7 @@ namespace
 {
 
 constexpr std::uint32_t minimumSectionBeats = 4;
+constexpr std::uint32_t minimumTerminalSectionBeats = 1;
 
 struct NoteBucket
 {
@@ -56,9 +57,15 @@ bool CompositionMidiSection::isValid(
         static_cast<double>(
             ticksPerQuarterNote);
 
+    const auto minimumValidSectionBeats =
+        role == PhraseSection::Cadence
+            ? static_cast<double>(
+                minimumTerminalSectionBeats)
+            : static_cast<double>(
+                minimumSectionBeats);
+
     return lengthBeats >=
-               static_cast<double>(
-                   minimumSectionBeats) &&
+               minimumValidSectionBeats &&
            notesPerBeat >= 0.0 &&
            averagePitch >= 0.0 &&
            averagePitch <= 127.0 &&
