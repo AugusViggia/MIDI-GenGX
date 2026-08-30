@@ -166,6 +166,8 @@ private:
     std::atomic<bool> generatorEnabled{false};
     std::atomic<bool> stopGenerationRequested{false};
     bool previousPlayingState = false;
+    bool previousRecordingState = false;
+    std::atomic<bool> transportPlayingState{false};
 
     std::array<midigengx::music::Phrase, 2> phraseBuffers;
     std::atomic<int> publishedPhraseBuffer{-1};

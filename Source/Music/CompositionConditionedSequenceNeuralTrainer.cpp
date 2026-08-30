@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <thread>
 #include <vector>
 
 namespace midigengx::music
@@ -122,20 +123,56 @@ double trainWindow(
     const auto timeCount =
         model.contract.contextLength;
 
-    using HiddenVector =
-        std::vector<double>;
+    if (timeCount == 0 ||
+        timeCount > 1024 ||
+        width == 0 ||
+        targetWidth == 0)
+    {
+        return std::numeric_limits<double>::infinity();
+    }
 
-    std::vector<HiddenVector> hidden(
-        timeCount + 1,
-        HiddenVector(
-            CompositionConditionedSequenceNeuralModel::hiddenWidth,
-            0.0));
+    struct Workspace
+    {
+        std::vector<double> hidden;
+        std::vector<double> dhNext;
+        std::vector<double> dh;
+        std::vector<double> nextDh;
+
+        void prepare(
+            std::size_t timeCount,
+            std::size_t hiddenWidth)
+        {
+            hidden.resize(
+                (timeCount + 1) *
+                hiddenWidth);
+
+            dhNext.resize(hiddenWidth);
+            dh.resize(hiddenWidth);
+            nextDh.resize(hiddenWidth);
+        }
+    };
+
+    thread_local Workspace workspace;
+
+    workspace.prepare(
+        timeCount,
+        CompositionConditionedSequenceNeuralModel::hiddenWidth);
+
+    std::fill(
+        workspace.hidden.begin(),
+        workspace.hidden.end(),
+        0.0);
+
+    std::fill(
+        workspace.dhNext.begin(),
+        workspace.dhNext.end(),
+        0.0);
 
     const auto embeddingWidth =
         CompositionConditionedSequenceNeuralModel::conditionEmbeddingWidth;
 
     auto addInitialCondition =
-        [&](HiddenVector& target)
+        [&](std::vector<double>& target)
         {
             const auto add =
                 [&](const std::vector<double>& embedding,
@@ -147,12 +184,18 @@ double trainWindow(
                         embeddingWidth;
 
                     for (std::size_t dimension = 0;
-                         dimension < embeddingWidth;
+                         dimension < embeddingWidth &&
+                         dimension <
+                             CompositionConditionedSequenceNeuralModel::hiddenWidth;
                          ++dimension)
                     {
-                        target[dimension] +=
-                            embedding[
-                                base + dimension];
+                        if (base + dimension <
+                            embedding.size())
+                        {
+                            target[dimension] +=
+                                embedding[
+                                    base + dimension];
+                        }
                     }
                 };
 
@@ -174,31 +217,33 @@ double trainWindow(
         };
 
     addInitialCondition(
-        hidden[0]);
-
-    std::vector<double> active(
-        timeCount,
-        0.0);
+        workspace.hidden);
 
     for (std::size_t time = 0;
          time < timeCount;
          ++time)
     {
-        active[time] =
-            window.paddingMask[time];
-
-        if (active[time] <= 0.0)
-            continue;
-
         const auto inputBase =
             time * width;
 
+        const auto hiddenBase =
+            time *
+            CompositionConditionedSequenceNeuralModel::hiddenWidth;
+
+        const auto nextHiddenBase =
+            (time + 1) *
+            CompositionConditionedSequenceNeuralModel::hiddenWidth;
+
         for (std::size_t row = 0;
-             row < CompositionConditionedSequenceNeuralModel::hiddenWidth;
+             row <
+                 CompositionConditionedSequenceNeuralModel::hiddenWidth;
              ++row)
         {
             double sum =
                 model.hiddenBias[row];
+
+            const auto inputWeightBase =
+                row * width;
 
             for (std::size_t column = 0;
                  column < width;
@@ -206,7 +251,7 @@ double trainWindow(
             {
                 sum +=
                     model.inputWeights[
-                        row * width +
+                        inputWeightBase +
                         column] *
                     window.inputs[
                         inputBase +
@@ -218,24 +263,36 @@ double trainWindow(
                 CompositionConditionedSequenceNeuralModel::hiddenWidth;
 
             for (std::size_t column = 0;
-                 column < CompositionConditionedSequenceNeuralModel::hiddenWidth;
+                 column <
+                     CompositionConditionedSequenceNeuralModel::hiddenWidth;
                  ++column)
             {
                 sum +=
                     model.recurrentWeights[
                         recurrentBase +
                         column] *
-                    hidden[time][column];
+                    workspace.hidden[
+                        hiddenBase +
+                        column];
             }
 
-            hidden[time + 1][row] =
+            workspace.hidden[
+                nextHiddenBase +
+                row] =
                 std::tanh(sum);
         }
     }
 
-    std::vector<double> output(
-        targetWidth,
-        0.0);
+    double loss = 0.0;
+
+    const auto finalHiddenBase =
+        timeCount *
+        CompositionConditionedSequenceNeuralModel::hiddenWidth;
+
+    const auto outputScale =
+        2.0 /
+        static_cast<double>(
+            targetWidth);
 
     for (std::size_t row = 0;
          row < targetWidth;
@@ -249,65 +306,55 @@ double trainWindow(
             CompositionConditionedSequenceNeuralModel::hiddenWidth;
 
         for (std::size_t column = 0;
-             column < CompositionConditionedSequenceNeuralModel::hiddenWidth;
+             column <
+                 CompositionConditionedSequenceNeuralModel::hiddenWidth;
              ++column)
         {
             sum +=
                 model.outputWeights[
-                    base + column] *
-                hidden[timeCount][column];
+                    base +
+                    column] *
+                workspace.hidden[
+                    finalHiddenBase +
+                    column];
         }
 
-        output[row] =
+        const auto output =
             std::clamp(
                 sum,
                 -1.0,
                 1.0);
-    }
 
-    double loss = 0.0;
-
-    std::vector<double> dhNext(
-        CompositionConditionedSequenceNeuralModel::hiddenWidth,
-        0.0);
-
-    const auto outputScale =
-        2.0 /
-        static_cast<double>(
-            targetWidth);
-
-    for (std::size_t row = 0;
-         row < targetWidth;
-         ++row)
-    {
-        const auto rawError =
-            output[row] -
+        const auto error =
+            output -
             window.targets[row];
 
         loss +=
-            rawError * rawError;
+            error *
+            error;
 
         const auto gradient =
-            rawError *
+            error *
             outputScale;
 
-        const auto base =
-            row *
-            CompositionConditionedSequenceNeuralModel::hiddenWidth;
-
         for (std::size_t column = 0;
-             column < CompositionConditionedSequenceNeuralModel::hiddenWidth;
+             column <
+                 CompositionConditionedSequenceNeuralModel::hiddenWidth;
              ++column)
         {
             gradients.outputWeights[
-                base + column] +=
+                base +
+                column] +=
                 gradient *
-                hidden[timeCount][column];
+                workspace.hidden[
+                    finalHiddenBase +
+                    column];
 
-            dhNext[column] +=
+            workspace.dhNext[column] +=
                 gradient *
                 model.outputWeights[
-                    base + column];
+                    base +
+                    column];
         }
 
         gradients.outputBias[row] +=
@@ -321,62 +368,76 @@ double trainWindow(
         const auto time =
             reverse - 1;
 
-        if (active[time] <= 0.0)
-        {
-            dhNext.assign(
-                dhNext.size(),
-                0.0);
-            continue;
-        }
-
-        std::vector<double> dh(
-            CompositionConditionedSequenceNeuralModel::hiddenWidth,
-            0.0);
-
-        for (std::size_t row = 0;
-             row < CompositionConditionedSequenceNeuralModel::hiddenWidth;
-             ++row)
-        {
-            dh[row] =
-                dhNext[row] *
-                (1.0 -
-                 hidden[time + 1][row] *
-                 hidden[time + 1][row]);
-        }
-
         const auto inputBase =
             time * width;
 
+        const auto hiddenBase =
+            time *
+            CompositionConditionedSequenceNeuralModel::hiddenWidth;
+
+        const auto nextHiddenBase =
+            (time + 1) *
+            CompositionConditionedSequenceNeuralModel::hiddenWidth;
+
         for (std::size_t row = 0;
-             row < CompositionConditionedSequenceNeuralModel::hiddenWidth;
+             row <
+                 CompositionConditionedSequenceNeuralModel::hiddenWidth;
              ++row)
         {
+            workspace.dh[row] =
+                workspace.dhNext[row] *
+                (1.0 -
+                 workspace.hidden[
+                     nextHiddenBase +
+                     row] *
+                 workspace.hidden[
+                     nextHiddenBase +
+                     row]);
+        }
+
+        for (std::size_t row = 0;
+             row <
+                 CompositionConditionedSequenceNeuralModel::hiddenWidth;
+             ++row)
+        {
+            const auto gradient =
+                workspace.dh[row];
+
             gradients.hiddenBias[row] +=
-                dh[row];
+                gradient;
+
+            const auto inputWeightBase =
+                row * width;
 
             for (std::size_t column = 0;
                  column < width;
                  ++column)
             {
                 gradients.inputWeights[
-                    row * width +
+                    inputWeightBase +
                     column] +=
-                    dh[row] *
+                    gradient *
                     window.inputs[
                         inputBase +
                         column];
             }
 
+            const auto recurrentBase =
+                row *
+                CompositionConditionedSequenceNeuralModel::hiddenWidth;
+
             for (std::size_t column = 0;
-                 column < CompositionConditionedSequenceNeuralModel::hiddenWidth;
+                 column <
+                     CompositionConditionedSequenceNeuralModel::hiddenWidth;
                  ++column)
             {
                 gradients.recurrentWeights[
-                    row *
-                        CompositionConditionedSequenceNeuralModel::hiddenWidth +
+                    recurrentBase +
                     column] +=
-                    dh[row] *
-                    hidden[time][column];
+                    gradient *
+                    workspace.hidden[
+                        hiddenBase +
+                        column];
             }
         }
 
@@ -385,30 +446,32 @@ double trainWindow(
             addEmbeddingGradient(
                 gradients.composerEmbeddings,
                 sample.composerIndex,
-                dh);
+                workspace.dh);
 
             addEmbeddingGradient(
                 gradients.styleEmbeddings,
                 sample.styleIndex,
-                dh);
+                workspace.dh);
 
             addEmbeddingGradient(
                 gradients.eraEmbeddings,
                 sample.eraIndex,
-                dh);
+                workspace.dh);
 
             addEmbeddingGradient(
                 gradients.instrumentationEmbeddings,
                 sample.instrumentationIndex,
-                dh);
+                workspace.dh);
         }
 
-        std::vector<double> nextDh(
-            CompositionConditionedSequenceNeuralModel::hiddenWidth,
+        std::fill(
+            workspace.nextDh.begin(),
+            workspace.nextDh.end(),
             0.0);
 
         for (std::size_t row = 0;
-             row < CompositionConditionedSequenceNeuralModel::hiddenWidth;
+             row <
+                 CompositionConditionedSequenceNeuralModel::hiddenWidth;
              ++row)
         {
             const auto base =
@@ -416,18 +479,20 @@ double trainWindow(
                 CompositionConditionedSequenceNeuralModel::hiddenWidth;
 
             for (std::size_t column = 0;
-                 column < CompositionConditionedSequenceNeuralModel::hiddenWidth;
+                 column <
+                     CompositionConditionedSequenceNeuralModel::hiddenWidth;
                  ++column)
             {
-                nextDh[column] +=
-                    dh[row] *
+                workspace.nextDh[column] +=
+                    workspace.dh[row] *
                     model.recurrentWeights[
-                        base + column];
+                        base +
+                        column];
             }
         }
 
-        dhNext =
-            std::move(nextDh);
+        workspace.dhNext.swap(
+            workspace.nextDh);
     }
 
     return loss /
@@ -559,7 +624,8 @@ trainCompositionConditionedSequenceNeuralModel(
         !finiteValue(config.learningRate) ||
         config.learningRate <= 0.0 ||
         !finiteValue(config.gradientClip) ||
-        config.gradientClip <= 0.0)
+        config.gradientClip <= 0.0 ||
+        config.evaluationInterval == 0)
     {
         return result;
     }
@@ -596,10 +662,6 @@ trainCompositionConditionedSequenceNeuralModel(
 
     result.windowCount =
         examples.size();
-
-    Gradients gradients =
-        makeGradients(
-            model);
 
     auto evaluateLoss =
         [&]()
@@ -646,10 +708,99 @@ trainCompositionConditionedSequenceNeuralModel(
     if (!finiteValue(result.initialLoss))
         return result;
 
+    const std::size_t requestedWorkers =
+        config.workerThreads == 0
+            ? static_cast<std::size_t>(
+                  std::thread::hardware_concurrency())
+            : config.workerThreads;
+
+    const std::size_t workerCount =
+        std::clamp(
+            requestedWorkers == 0
+                ? std::size_t{1}
+                : requestedWorkers,
+            std::size_t{1},
+            examples.size());
+
+    Gradients gradients =
+        makeGradients(model);
+
+    std::vector<Gradients> workerGradients;
+    workerGradients.reserve(workerCount);
+
+    for (std::size_t index = 0;
+         index < workerCount;
+         ++index)
+    {
+        workerGradients.push_back(
+            makeGradients(model));
+    }
+
     for (std::size_t epoch = 0;
          epoch < config.epochs;
          ++epoch)
     {
+        for (auto& worker : workerGradients)
+        {
+            for (auto* values :
+                 {
+                     &worker.inputWeights,
+                     &worker.recurrentWeights,
+                     &worker.hiddenBias,
+                     &worker.outputWeights,
+                     &worker.outputBias,
+                     &worker.composerEmbeddings,
+                     &worker.styleEmbeddings,
+                     &worker.eraEmbeddings,
+                     &worker.instrumentationEmbeddings
+                 })
+            {
+                std::fill(
+                    values->begin(),
+                    values->end(),
+                    0.0);
+            }
+        }
+
+        std::vector<std::thread> workers;
+        workers.reserve(workerCount);
+
+        for (std::size_t workerIndex = 0;
+             workerIndex < workerCount;
+             ++workerIndex)
+        {
+            workers.emplace_back(
+                [&, workerIndex]()
+                {
+                    const std::size_t begin =
+                        examples.size() *
+                        workerIndex /
+                        workerCount;
+
+                    const std::size_t end =
+                        examples.size() *
+                        (workerIndex + 1) /
+                        workerCount;
+
+                    for (std::size_t exampleIndex = begin;
+                         exampleIndex < end;
+                         ++exampleIndex)
+                    {
+                        trainWindow(
+                            model,
+                            examples[exampleIndex].window,
+                            *examples[exampleIndex].sample,
+                            workerGradients[workerIndex]);
+                    }
+                });
+        }
+
+        for (auto& worker :
+             workers)
+        {
+            worker.join();
+        }
+
         for (auto* values :
              {
                  &gradients.inputWeights,
@@ -669,14 +820,49 @@ trainCompositionConditionedSequenceNeuralModel(
                 0.0);
         }
 
-        for (const auto& example :
-             examples)
+        for (const auto& worker :
+             workerGradients)
         {
-            trainWindow(
-                model,
-                example.window,
-                *example.sample,
-                gradients);
+            auto accumulate =
+                [](std::vector<double>& destination,
+                   const std::vector<double>& source)
+                {
+                    for (std::size_t index = 0;
+                         index < destination.size();
+                         ++index)
+                    {
+                        destination[index] +=
+                            source[index];
+                    }
+                };
+
+            accumulate(
+                gradients.inputWeights,
+                worker.inputWeights);
+            accumulate(
+                gradients.recurrentWeights,
+                worker.recurrentWeights);
+            accumulate(
+                gradients.hiddenBias,
+                worker.hiddenBias);
+            accumulate(
+                gradients.outputWeights,
+                worker.outputWeights);
+            accumulate(
+                gradients.outputBias,
+                worker.outputBias);
+            accumulate(
+                gradients.composerEmbeddings,
+                worker.composerEmbeddings);
+            accumulate(
+                gradients.styleEmbeddings,
+                worker.styleEmbeddings);
+            accumulate(
+                gradients.eraEmbeddings,
+                worker.eraEmbeddings);
+            accumulate(
+                gradients.instrumentationEmbeddings,
+                worker.instrumentationEmbeddings);
         }
 
         const auto scale =
@@ -717,6 +903,31 @@ trainCompositionConditionedSequenceNeuralModel(
             return result;
 
         ++result.epochsCompleted;
+
+        if (config.progressCallback)
+        {
+            const auto shouldEvaluate =
+                ((epoch + 1) %
+                     config.evaluationInterval == 0) ||
+                epoch + 1 ==
+                    config.epochs;
+
+            const auto epochLoss =
+                shouldEvaluate
+                    ? evaluateLoss()
+                    : std::numeric_limits<double>::quiet_NaN();
+
+            if (shouldEvaluate &&
+                !finiteValue(epochLoss))
+            {
+                return result;
+            }
+
+            config.progressCallback(
+                result.epochsCompleted,
+                config.epochs,
+                epochLoss);
+        }
     }
 
     result.finalLoss =

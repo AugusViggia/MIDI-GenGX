@@ -108,6 +108,8 @@ void MIDIGenGXAudioProcessor::prepareToPlay(
 
     lastPpqPosition = 0.0;
     previousPlayingState = false;
+    previousRecordingState = false;
+    transportPlayingState.store(false, std::memory_order_release);
 
     generationPending.store(false);
     generationRequestId.fetch_add(1, std::memory_order_acq_rel);
@@ -156,6 +158,16 @@ void MIDIGenGXAudioProcessor::processBlock(
     const auto position = getPositionInfo();
     const bool isPlaying =
         position.hasValue() && position->getIsPlaying();
+    const bool isRecording =
+        position.hasValue() && position->getIsRecording();
+
+    transportPlayingState.store(
+        isPlaying,
+        std::memory_order_release);
+
+    const bool transportStopDetected =
+        (previousPlayingState && !isPlaying) ||
+        (previousRecordingState && !isRecording);
 
     if (stopGenerationRequested.exchange(false))
     {
@@ -166,12 +178,36 @@ void MIDIGenGXAudioProcessor::processBlock(
             generationPending.store(false, std::memory_order_release);
 
         previousPlayingState = isPlaying;
+        previousRecordingState = isRecording;
+        return;
+    }
+
+    if (transportStopDetected)
+    {
+        stopActiveNote(midiMessages);
+        generatorEnabled.store(
+            false,
+            std::memory_order_release);
+        generationPending.store(
+            false,
+            std::memory_order_release);
+        generationRequestId.fetch_add(
+            1,
+            std::memory_order_acq_rel);
+
+        if (generationWorker)
+            generationWorker->invalidate();
+
+        resetGeneration();
+        previousPlayingState = isPlaying;
+        previousRecordingState = isRecording;
         return;
     }
 
     if (!generatorEnabled.load())
     {
         previousPlayingState = isPlaying;
+        previousRecordingState = isRecording;
         return;
     }
 
@@ -188,6 +224,7 @@ void MIDIGenGXAudioProcessor::processBlock(
     }
 
     previousPlayingState = isPlaying;
+    previousRecordingState = isRecording;
 
     const double currentPpq =
         position.hasValue() &&
@@ -344,8 +381,12 @@ void MIDIGenGXAudioProcessor::resetGeneration()
 void MIDIGenGXAudioProcessor::markContextChanged() noexcept
 {
     generationPending.store(true,std::memory_order_release);
-    if (!restoringState && generatorEnabled.load(std::memory_order_acquire))
+    if (!restoringState &&
+        generatorEnabled.load(std::memory_order_acquire) &&
+        transportPlayingState.load(std::memory_order_acquire))
+    {
         requestPhraseGeneration();
+    }
 }
 
 void MIDIGenGXAudioProcessor::stopActiveNote(

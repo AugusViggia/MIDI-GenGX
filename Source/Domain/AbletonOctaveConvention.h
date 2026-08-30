@@ -1,3 +1,4 @@
+
 #pragma once
 
 namespace midigengx::domain
@@ -5,17 +6,22 @@ namespace midigengx::domain
 
 struct AbletonOctaveConvention
 {
-    // MIDI-GenGX keeps an internal C-register offset where:
-    // internal 2 -> MIDI C2 in mathematical naming / C1 in Ableton naming.
+    // MIDI-GenGX keeps a one-step internal register offset so existing
+    // serialized processor state remains compatible. The UI exposes the
+    // user-facing Ableton octave numbers directly: -2 through 8.
     //
-    // The UI exposes Ableton-compatible octave labels, while the engine keeps
-    // its existing internal register representation stable.
+    // Therefore:
+    //   Ableton octave -2 -> internal register -1
+    //   Ableton octave  8 -> internal register  9
+    //
+    // The musical engine converts the internal register to the corresponding
+    // absolute C boundary before filtering by the selected key/scale.
 
     static constexpr int minInternalRegister = -1;
-    static constexpr int maxInternalRegister = 7;
+    static constexpr int maxInternalRegister = 9;
 
     static constexpr int minAbletonOctave = -2;
-    static constexpr int maxAbletonOctave = 6;
+    static constexpr int maxAbletonOctave = 8;
 
     static constexpr int abletonOctaveToInternal(
         int abletonOctave) noexcept

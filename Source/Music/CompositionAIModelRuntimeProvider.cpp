@@ -144,7 +144,13 @@ Phrase CompositionAIModelRuntimeProvider::generate(
             generationRequest);
 
     if (result.isValid())
-        return result.phrase;
+    {
+        auto phrase = result.phrase;
+        MusicalEngine::constrainPhraseToMusicalContext(
+            phrase,
+            context);
+        return phrase;
+    }
 
     MusicalEngine engine;
 

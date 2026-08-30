@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.22)
+﻿cmake_minimum_required(VERSION 3.22)
 
 project(MIDI_GenGX VERSION 0.3.6 LANGUAGES C CXX)
 
@@ -183,6 +183,7 @@ set(MIDI_GENGX_MUSIC_SOURCES
     Source/Music/CompositionConditionedTrainingDatasetArtifact.cpp
     Source/Music/CompositionConditionedSequenceNeuralModel.h
     Source/Music/CompositionConditionedSequenceNeuralModel.cpp
+    Source/Music/CompositionConditionedMidiDecoder.cpp
     Source/Music/CompositionConditionedSequenceNeuralTrainer.h
     Source/Music/CompositionConditionedSequenceNeuralTrainer.cpp
     Source/Music/CompositionConditionedSequenceNeuralModelArtifact.h
@@ -2420,7 +2421,7 @@ target_link_libraries(
 set_property(
     TARGET MIDI_GenGX_CompositionRealComposerTrainingCli
     PROPERTY
-        MSVC_RUNTIME_LIBRARY "MultiThreadedDLL"
+        MSVC_RUNTIME_LIBRARY "MultiThreadedDebugDLL"
 )
 
 # -------------------- Phase 109 metadata loader tests --------------------
@@ -2973,4 +2974,119 @@ set_property(
 add_test(
     NAME MIDI_GenGX_CompositionKnowledgeTrainingDatasetTests
     COMMAND MIDI_GenGX_CompositionKnowledgeTrainingDatasetTests
+)
+
+# -------------------- Phase 121A conditioned model fine-tuning --------------------
+add_executable(MIDI_GenGX_CompositionConditionedSequenceNeuralFineTuningCli
+    Source/Music/CompositionConditionedSequenceNeuralFineTuningCli.cpp
+)
+
+target_include_directories(
+    MIDI_GenGX_CompositionConditionedSequenceNeuralFineTuningCli
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/Source
+)
+
+target_link_libraries(
+    MIDI_GenGX_CompositionConditionedSequenceNeuralFineTuningCli
+    PRIVATE
+        MIDI_GenGX_Music
+)
+
+set_property(
+    TARGET MIDI_GenGX_CompositionConditionedSequenceNeuralFineTuningCli
+    PROPERTY
+        MSVC_RUNTIME_LIBRARY "MultiThreadedDebugDLL"
+)
+
+# -------------------- Phase 121 baseline vs final evaluation --------------------
+add_executable(MIDI_GenGX_Phase121BaselineVsFinalEvaluation
+    Source/Music/Phase121BaselineVsFinalEvaluationCli.cpp
+)
+
+target_include_directories(
+    MIDI_GenGX_Phase121BaselineVsFinalEvaluation
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/Source
+)
+
+target_link_libraries(
+    MIDI_GenGX_Phase121BaselineVsFinalEvaluation
+    PRIVATE
+        MIDI_GenGX_Music
+)
+
+set_property(
+    TARGET MIDI_GenGX_Phase121BaselineVsFinalEvaluation
+    PROPERTY
+        MSVC_RUNTIME_LIBRARY "MultiThreadedDebugDLL"
+)
+
+# -------------------- Phase 121 validation/test comparison --------------------
+add_executable(MIDI_GenGX_Phase121ValidationTestComparison
+    Source/Music/Phase121ValidationTestComparisonCli.cpp
+)
+
+target_include_directories(
+    MIDI_GenGX_Phase121ValidationTestComparison
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/Source
+)
+
+target_link_libraries(
+    MIDI_GenGX_Phase121ValidationTestComparison
+    PRIVATE
+        MIDI_GenGX_Music
+)
+
+set_property(
+    TARGET MIDI_GenGX_Phase121ValidationTestComparison
+    PROPERTY
+        MSVC_RUNTIME_LIBRARY "MultiThreadedDebugDLL"
+)
+
+# -------------------- Phase 121 real autoregressive rollout comparison --------------------
+add_executable(MIDI_GenGX_Phase121RealAutoregressiveRolloutComparison
+    Source/Music/Phase121RealAutoregressiveRolloutComparisonCli.cpp
+)
+
+target_include_directories(
+    MIDI_GenGX_Phase121RealAutoregressiveRolloutComparison
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/Source
+)
+
+target_link_libraries(
+    MIDI_GenGX_Phase121RealAutoregressiveRolloutComparison
+    PRIVATE
+        MIDI_GenGX_Music
+)
+
+set_property(
+    TARGET MIDI_GenGX_Phase121RealAutoregressiveRolloutComparison
+    PROPERTY
+        MSVC_RUNTIME_LIBRARY "MultiThreadedDebugDLL"
+)
+
+# -------------------- Phase 122 generated MIDI musical metrics --------------------
+add_executable(MIDI_GenGX_Phase122GeneratedMidiMusicalMetrics
+    Source/Music/Phase122GeneratedMidiMusicalMetricsCli.cpp
+)
+
+target_include_directories(
+    MIDI_GenGX_Phase122GeneratedMidiMusicalMetrics
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/Source
+)
+
+target_link_libraries(
+    MIDI_GenGX_Phase122GeneratedMidiMusicalMetrics
+    PRIVATE
+        MIDI_GenGX_Music
+)
+
+set_property(
+    TARGET MIDI_GenGX_Phase122GeneratedMidiMusicalMetrics
+    PROPERTY
+        MSVC_RUNTIME_LIBRARY "MultiThreadedDebugDLL"
 )

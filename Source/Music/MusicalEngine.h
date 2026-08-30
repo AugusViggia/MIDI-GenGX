@@ -23,6 +23,12 @@ public:
         const CompositionAIGuidance& guidance,
         std::uint32_t seed = 1) const;
 
+    // Final hard musical gate for every generated phrase. The selected key,
+    // scale, and register are authoritative; only pitch is adjusted.
+    static void constrainPhraseToMusicalContext(
+        Phrase& phrase,
+        const midigengx::domain::MusicalContext& context);
+
     Phrase generateLead(
         const midigengx::domain::MusicalContext& context,
         std::uint32_t seed = 1) const;

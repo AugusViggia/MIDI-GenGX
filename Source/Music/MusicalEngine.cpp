@@ -74,7 +74,8 @@ int chooseNearestPitchClass(
         const int distance =
             std::abs(midi - targetMidiNote);
 
-        if (distance < bestDistance)
+        if (distance < bestDistance ||
+            (distance == bestDistance && midi < best))
         {
             best = midi;
             bestDistance = distance;
@@ -194,6 +195,56 @@ std::vector<int> MusicalEngine::buildScalePitchPool(
     }
 
     return pool;
+}
+
+void MusicalEngine::constrainPhraseToMusicalContext(
+    Phrase& phrase,
+    const midigengx::domain::MusicalContext& inputContext)
+{
+    auto context = inputContext;
+    context.normalize();
+
+    const auto pitchClasses =
+        context.scale.getPitchClasses(
+            midigengx::domain::toPitchClass(context.key));
+
+    if (pitchClasses.empty())
+        return;
+
+    const int lowMidi = clampMidi(
+        lowestMidiForOctaveRange(
+            context.parameters.octaveLow));
+
+    const int highMidi = clampMidi(
+        lowestMidiForOctaveRange(
+            context.parameters.octaveHigh));
+
+    const int safeLow = std::min(lowMidi, highMidi);
+    const int safeHigh = std::max(lowMidi, highMidi);
+
+    const auto pitchPool =
+        buildScalePitchPool(
+            pitchClasses,
+            safeLow,
+            safeHigh);
+
+    if (pitchPool.empty())
+    {
+        phrase.notes.clear();
+        phrase.lengthBeats = 0.0;
+        return;
+    }
+
+    for (auto& note : phrase.notes)
+    {
+        note.midiNote = chooseNearestScalePitch(
+            pitchClasses,
+            note.midiNote,
+            safeLow,
+            safeHigh);
+    }
+
+    phrase.normalize();
 }
 
 int MusicalEngine::choosePitchAcrossRange(
@@ -384,37 +435,59 @@ Phrase MusicalEngine::generate(
     const midigengx::domain::MusicalContext& inputContext,
     std::uint32_t seed) const
 {
-    switch (inputContext.role)
+    auto context = inputContext;
+    context.normalize();
+
+    Phrase phrase;
+
+    switch (context.role)
     {
         case midigengx::domain::Role::Lead:
-            return generateLead(inputContext, seed);
+            phrase = generateLead(context, seed);
+            break;
 
         case midigengx::domain::Role::Melody:
-            return generateLead(inputContext, seed + 17);
+            phrase = generateLead(context, seed + 17);
+            break;
 
         case midigengx::domain::Role::Pluck:
-            return generateMonophonicRole(inputContext, seed + 31, 0, true, false);
+            phrase = generateMonophonicRole(context, seed + 31, 0, true, false);
+            break;
 
         case midigengx::domain::Role::Piano:
-            return generateMonophonicRole(inputContext, seed + 43, 0, false, false);
+            phrase = generateMonophonicRole(context, seed + 43, 0, false, false);
+            break;
 
         case midigengx::domain::Role::Sequence:
-            return generateMonophonicRole(inputContext, seed + 59, 0, true, false);
+            phrase = generateMonophonicRole(context, seed + 59, 0, true, false);
+            break;
 
         case midigengx::domain::Role::Bass:
-            return generateBass(inputContext, seed);
+            phrase = generateBass(context, seed);
+            break;
 
         case midigengx::domain::Role::Arp:
-            return generateArp(inputContext, seed);
+            phrase = generateArp(context, seed);
+            break;
 
         case midigengx::domain::Role::Chords:
-            return generateChords(inputContext, seed);
+            phrase = generateChords(context, seed);
+            break;
 
         case midigengx::domain::Role::Pad:
-            return generatePad(inputContext, seed);
+            phrase = generatePad(context, seed);
+            break;
     }
 
-    return generateLead(inputContext, seed);
+    // Key + scale + octave range are hard musical constraints. The generator
+    // may choose freely inside this tonal/register space, but it can never
+    // publish a note outside it. This also makes the rule future-proof for
+    // AI-guided generation because the MusicalEngine remains authoritative.
+    constrainPhraseToMusicalContext(
+        phrase,
+        context);
+
+    return phrase;
 }
 
 Phrase MusicalEngine::generateWithAIGuidance(
@@ -819,10 +892,6 @@ Phrase MusicalEngine::generateLead(
         -8,
         8);
 
-    std::uniform_int_distribution<int> randomScale(
-        0,
-        scaleSize - 1);
-
     int previousScaleIndex =
         0;
 
@@ -1019,9 +1088,20 @@ Phrase MusicalEngine::generateLead(
                             endpointRegisterIndex)];
             }
 
+            // The selected scale degree is part of the composition, not just
+            // a validation hint.  Choose the actual pitch class represented by
+            // scaleIndex, then place that degree at the contour-selected
+            // register.  This makes Key + Scale audible in the generated MIDI
+            // instead of merely constraining a generic pitch walk afterwards.
+            const int selectedScaleDegree =
+                std::clamp(scaleIndex, 0, scaleSize - 1);
+
+            const int selectedPitchClass =
+                pitchClasses[static_cast<std::size_t>(selectedScaleDegree)];
+
             int midi =
-                chooseNearestScalePitch(
-                    pitchClasses,
+                chooseNearestPitchClass(
+                    selectedPitchClass,
                     targetMidi,
                     safeLow,
                     safeHigh);

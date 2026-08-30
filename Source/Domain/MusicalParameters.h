@@ -1,4 +1,7 @@
+
 #pragma once
+
+#include "AbletonOctaveConvention.h"
 
 #include <algorithm>
 #include <utility>
@@ -94,8 +97,14 @@ struct MusicalParameters
 
     void clamp()
     {
-        octaveLow = std::clamp(octaveLow, -8, 8);
-        octaveHigh = std::clamp(octaveHigh, -8, 8);
+        octaveLow = std::clamp(
+            octaveLow,
+            AbletonOctaveConvention::minInternalRegister,
+            AbletonOctaveConvention::maxInternalRegister);
+        octaveHigh = std::clamp(
+            octaveHigh,
+            AbletonOctaveConvention::minInternalRegister,
+            AbletonOctaveConvention::maxInternalRegister);
         octaveShift = std::clamp(octaveShift, -2, 2);
 
         if (octaveLow > octaveHigh)

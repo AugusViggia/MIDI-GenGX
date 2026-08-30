@@ -7,7 +7,8 @@
 #include "PluginProcessor.h"
 
 class MIDIGenGXAudioProcessorEditor
-    : public juce::AudioProcessorEditor
+    : public juce::AudioProcessorEditor,
+      private juce::Timer
 {
 private:
     class DownwardSelector : public juce::Component
@@ -145,6 +146,7 @@ public:
     void mouseDown(const juce::MouseEvent&) override;
 
 private:
+    void timerCallback() override;
     void populateSelectors();
     void syncControlsFromProcessor();
     void pushContextToProcessor();

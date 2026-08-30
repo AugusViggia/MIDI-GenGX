@@ -1,3 +1,4 @@
+
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 
@@ -42,14 +43,19 @@ if ($Editor -notmatch "internalToAbletonOctave")
     throw "Plugin UI does not use the centralized Ableton octave convention."
 }
 
-if ($Editor -notmatch "C2")
+if ($Header -notmatch "minAbletonOctave = -2")
 {
-    # The UI labels are generated programmatically; this guard intentionally
-    # accepts the generated convention rather than hardcoding individual rows.
-    if ($Editor -notmatch "AbletonOctaveConvention")
-    {
-        throw "Octave selector convention is not wired into the UI."
-    }
+    throw "Ableton octave minimum must remain -2."
+}
+
+if ($Header -notmatch "maxAbletonOctave = 8")
+{
+    throw "Ableton octave maximum must be 8."
+}
+
+if ($Editor -notmatch 'octaves\.add\(\s*juce::String\(\s*abletonOctave\s*\)')
+{
+    throw "Octave selector must expose numeric octave values without a C prefix."
 }
 
 if ($DomainTests -notmatch "testAbletonOctaveConvention")

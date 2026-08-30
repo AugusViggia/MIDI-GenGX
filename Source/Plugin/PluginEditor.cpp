@@ -549,6 +549,7 @@ MIDIGenGXAudioProcessorEditor(
 
     setSize(baseWidth, baseHeight);
     setResizable(false, false);
+    startTimerHz(10);
 
     juce::Desktop::getInstance().addGlobalMouseListener(
         this);
@@ -1064,6 +1065,8 @@ containsPopupComponent(
 MIDIGenGXAudioProcessorEditor::
 ~MIDIGenGXAudioProcessorEditor()
 {
+    stopTimer();
+
     juce::Desktop::getInstance().removeGlobalMouseListener(
         this);
 
@@ -2310,6 +2313,11 @@ void MIDIGenGXAudioProcessorEditor::pushContextToProcessor()
                 cadenceStrengthSlider.getValue())));
 }
 
+void MIDIGenGXAudioProcessorEditor::timerCallback()
+{
+    syncControlsFromProcessor();
+}
+
 void MIDIGenGXAudioProcessorEditor::paint(
     juce::Graphics& g)
 {
@@ -2697,7 +2705,6 @@ void MIDIGenGXAudioProcessorEditor::resized()
             juce::Font::plain));
 
     // Generation actions.
-    const int actionGap = S(10);
     const int actionY = S(670);
     const int actionH = S(42);
     const int sideButtonWidth = S(150);
