@@ -93,16 +93,12 @@ void testAbletonOctaveConvention()
         "Ableton octave UI range is -2 through 8");
 
     expect(
+        Convention::abletonOctaveToInternal(-2) == -1,
+        "Ableton -2 maps to internal -1");
+
+    expect(
         Convention::abletonOctaveToInternal(8) == 9,
-        "Ableton C8 maps to internal register 9");
-
-    expect(
-        Convention::internalToAbletonOctave(9) == 8,
-        "internal register 9 displays as Ableton octave 8");
-
-    expect(
-        Convention::midiForC(8) == 120,
-        "Ableton C8 is MIDI 120");
+        "Ableton 8 maps to internal 9");
 }
 
 void testGenreProfiles()
@@ -219,3 +215,5 @@ int main()
 
     return 0;
 }
+
+

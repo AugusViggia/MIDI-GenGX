@@ -316,7 +316,7 @@ setSelectedIndex(
     selectedIndex = newIndex;
     updateVisuals();
 
-    if (open)
+    if (changed && open)
         hidePopup();
 
     if (changed && sendCallback)
@@ -413,7 +413,17 @@ showPopup()
         return;
 
     owner.closeInfoPopup();
-    owner.closeSelectorPopups();
+    owner.genreBox.hidePopup();
+    owner.keyBox.hidePopup();
+    owner.scaleBox.hidePopup();
+    owner.roleBox.hidePopup();
+    owner.lengthBox.hidePopup();
+    owner.octaveLowBox.hidePopup();
+    owner.octaveHighBox.hidePopup();
+    owner.octaveShiftBox.hidePopup();
+    owner.noteLengthBox.hidePopup();
+    owner.phraseContourBox.hidePopup();
+    owner.cadenceStyleBox.hidePopup();
     open = true;
 
     popup =
@@ -1954,23 +1964,15 @@ void MIDIGenGXAudioProcessorEditor::populateSelectors()
 
     juce::StringArray octaves;
 
-    for (int internalRegister =
+    for (int abletonOctave =
              midigengx::domain::AbletonOctaveConvention::
-                 minInternalRegister;
-         internalRegister <=
+                 minAbletonOctave;
+         abletonOctave <=
              midigengx::domain::AbletonOctaveConvention::
-                 maxInternalRegister;
-         ++internalRegister)
+                 maxAbletonOctave;
+         ++abletonOctave)
     {
-        const int abletonOctave =
-            midigengx::domain::AbletonOctaveConvention::
-                internalToAbletonOctave(
-                    internalRegister);
-
-        octaves.add(
-            "C" +
-            juce::String(
-                abletonOctave));
+        octaves.add(juce::String(abletonOctave));
     }
 
     juce::StringArray shifts;
@@ -2065,7 +2067,10 @@ void MIDIGenGXAudioProcessorEditor::syncControlsFromProcessor()
         {
             return juce::jlimit(
                 0,
-                8,
+                midigengx::domain::AbletonOctaveConvention::
+                    maxAbletonOctave -
+                    midigengx::domain::AbletonOctaveConvention::
+                    minAbletonOctave,
                 internalRegister -
                     midigengx::domain::AbletonOctaveConvention::
                         minInternalRegister);
