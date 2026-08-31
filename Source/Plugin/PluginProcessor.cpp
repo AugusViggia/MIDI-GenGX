@@ -1,5 +1,6 @@
 #include <cstring>
 #include "PluginProcessor.h"
+#include "../Music/BuiltInAIModel.h"
 #include "../Generation/GenerationActivationPolicy.h"
 #include "../Domain/GenrePresets.h"
 #include "../Generation/PhraseGenerationWorker.h"
@@ -68,6 +69,13 @@ MIDIGenGXAudioProcessor::MIDIGenGXAudioProcessor()
     octaveLow.store(2);
     octaveHigh.store(4);
     octaveShift.store(0);
+
+    const juce::MemoryBlock builtInModel(
+        midigengx::music::built_in_ai_model::data(),
+        midigengx::music::built_in_ai_model::size());
+
+    if (loadAIRuntimeModel(builtInModel))
+        aiRuntimeGeneration.setEnabled(true);
 
     generationWorker =
         std::make_unique<midigengx::generation::PhraseGenerationWorker>(
@@ -695,21 +703,33 @@ void MIDIGenGXAudioProcessor::setAIRuntimeGenerationProvider(
 bool MIDIGenGXAudioProcessor::loadAIRuntimeModel(
     const juce::MemoryBlock& artifactBytes)
 {
-    midigengx::music::CompositionNeuralModelArtifact artifact;
+    midigengx::music::CompositionConditionedSequenceNeuralModelArtifact conditionedArtifact;
 
-    artifact.bytes.resize(
+    conditionedArtifact.bytes.resize(
         artifactBytes.getSize());
 
     if (artifactBytes.getSize() != 0)
     {
         std::memcpy(
-            artifact.bytes.data(),
+            conditionedArtifact.bytes.data(),
             artifactBytes.getData(),
             artifactBytes.getSize());
     }
 
+    // Phase 123 embeds the conditioned sequence model. Keep the legacy
+    // artifact path below so existing external model-loading behavior remains
+    // compatible with the pre-conditioned runtime API.
+    if (aiRuntimeGeneration.loadConditionedModelArtifact(
+            conditionedArtifact))
+    {
+        return true;
+    }
+
+    midigengx::music::CompositionNeuralModelArtifact legacyArtifact;
+    legacyArtifact.bytes = conditionedArtifact.bytes;
+
     return aiRuntimeGeneration.loadModelArtifact(
-        artifact);
+        legacyArtifact);
 }
 
 bool MIDIGenGXAudioProcessor::loadAIRuntimeModelFromFile(

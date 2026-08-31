@@ -190,6 +190,8 @@ set(MIDI_GENGX_MUSIC_SOURCES
     Source/Music/CompositionConditionedSequenceNeuralModelArtifact.cpp
     Source/Music/CompositionConditionedSequenceNeuralModelRuntimeLoader.h
     Source/Music/CompositionConditionedSequenceNeuralModelRuntimeLoader.cpp
+    Source/Music/CompositionConditionedSequenceNeuralModelRuntimeProvider.h
+    Source/Music/CompositionConditionedSequenceNeuralModelRuntimeProvider.cpp
     Source/Music/CompositionConditionedSequenceNeuralModelArtifactFileInspector.h
     Source/Music/CompositionConditionedSequenceNeuralModelArtifactFileInspector.cpp
     Source/Music/CompositionConditionedSequenceNeuralTrainingService.h
@@ -310,6 +312,14 @@ juce_add_plugin(MIDI_GenGX
 
 juce_generate_juce_header(MIDI_GenGX)
 
+juce_add_binary_data(MIDI_GenGX_BuiltInAIModel
+    HEADER_NAME MIDI_GenGX_BuiltInAIModelData.h
+    NAMESPACE MIDI_GenGX_BuiltInAIModelData
+    SOURCES
+        ${CMAKE_CURRENT_SOURCE_DIR}/Resources/AI/ChopinPhase122BStructuredLossR1.mgcn
+)
+
+
 target_sources(MIDI_GenGX
     PRIVATE
         Source/Plugin/PluginProcessor.cpp
@@ -322,11 +332,18 @@ target_sources(MIDI_GenGX
         Source/Generation/PhraseGenerationWorker.h
         Source/Generation/GenerationActivationPolicy.cpp
         Source/Generation/GenerationActivationPolicy.h
+        Source/Music/BuiltInAIModel.cpp
+        Source/Music/BuiltInAIModel.h
 )
 
 target_include_directories(MIDI_GenGX
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/Source
+)
+
+target_link_libraries(MIDI_GenGX
+    PRIVATE
+        MIDI_GenGX_BuiltInAIModel
 )
 
 target_compile_definitions(MIDI_GenGX
@@ -2896,6 +2913,48 @@ add_test(
     COMMAND MIDI_GenGX_PluginAIRuntimeEndToEndTests
 )
 
+# -------------------- Built-in AI model integration --------------------
+add_executable(MIDI_GenGX_BuiltInAIRuntimeModelTests
+    Source/Tests/BuiltInAIRuntimeModelTests.cpp
+)
+
+target_include_directories(
+    MIDI_GenGX_BuiltInAIRuntimeModelTests
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/Source
+        ${CMAKE_CURRENT_BINARY_DIR}/MIDI_GenGX_artefacts/JuceLibraryCode
+        ${CMAKE_CURRENT_SOURCE_DIR}/JUCE/modules
+)
+
+target_link_libraries(
+    MIDI_GenGX_BuiltInAIRuntimeModelTests
+    PRIVATE
+        MIDI_GenGX
+        MIDI_GenGX_BuiltInAIModel
+        juce::juce_audio_processors
+        juce::juce_audio_basics
+        juce::juce_core
+)
+
+target_compile_definitions(
+    MIDI_GenGX_BuiltInAIRuntimeModelTests
+    PRIVATE
+        JUCE_WEB_BROWSER=0
+        JUCE_USE_CURL=0
+        JUCE_VST3_CAN_REPLACE_VST2=0
+)
+
+set_property(
+    TARGET MIDI_GenGX_BuiltInAIRuntimeModelTests
+    PROPERTY
+        MSVC_RUNTIME_LIBRARY "MultiThreadedDebugDLL"
+)
+
+add_test(
+    NAME MIDI_GenGX_BuiltInAIRuntimeModelTests
+    COMMAND MIDI_GenGX_BuiltInAIRuntimeModelTests
+)
+
 # -------------------- Phase 116 composer knowledge representation --------------------
 add_executable(MIDI_GenGX_CompositionComposerKnowledgeRepresentationTests
     Source/Tests/CompositionComposerKnowledgeRepresentationTests.cpp
@@ -3089,32 +3148,4 @@ set_property(
     TARGET MIDI_GenGX_Phase122GeneratedMidiMusicalMetrics
     PROPERTY
         MSVC_RUNTIME_LIBRARY "MultiThreadedDebugDLL"
-)
-
-# -------------------- Phase 122B structured loss tests --------------------
-add_executable(MIDI_GenGX_CompositionConditionedStructuredLossTests
-    Source/Tests/CompositionConditionedStructuredLossTests.cpp
-)
-
-target_include_directories(
-    MIDI_GenGX_CompositionConditionedStructuredLossTests
-    PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/Source
-)
-
-target_link_libraries(
-    MIDI_GenGX_CompositionConditionedStructuredLossTests
-    PRIVATE
-        MIDI_GenGX_Music
-)
-
-set_property(
-    TARGET MIDI_GenGX_CompositionConditionedStructuredLossTests
-    PROPERTY
-        MSVC_RUNTIME_LIBRARY "MultiThreadedDebugDLL"
-)
-
-add_test(
-    NAME MIDI_GenGX_CompositionConditionedStructuredLossTests
-    COMMAND MIDI_GenGX_CompositionConditionedStructuredLossTests
 )

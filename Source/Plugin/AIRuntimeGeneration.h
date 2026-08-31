@@ -3,6 +3,8 @@
 #include "../Domain/MusicalContext.h"
 #include "../Music/CompositionAIModelRuntimeProvider.h"
 #include "../Music/CompositionNeuralModelArtifact.h"
+#include "../Music/CompositionConditionedSequenceNeuralModelArtifact.h"
+#include "../Music/CompositionConditionedSequenceNeuralModelRuntimeProvider.h"
 #include "../Music/MusicalEngine.h"
 
 #include <atomic>
@@ -36,6 +38,9 @@ public:
     bool loadModelArtifact(
         const midigengx::music::CompositionNeuralModelArtifact& artifact);
 
+    bool loadConditionedModelArtifact(
+        const midigengx::music::CompositionConditionedSequenceNeuralModelArtifact& artifact);
+
     bool hasLoadedModel() const noexcept;
 
     void clearModel();
@@ -54,6 +59,9 @@ private:
     std::shared_ptr<
         const midigengx::music::CompositionAIModelRuntimeProvider>
         modelProvider;
+    std::shared_ptr<
+        const midigengx::music::CompositionConditionedSequenceNeuralModelRuntimeProvider>
+        conditionedModelProvider;
 };
 
 } // namespace midigengx::plugin

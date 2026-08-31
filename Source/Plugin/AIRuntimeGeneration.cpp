@@ -1,5 +1,7 @@
 #include "AIRuntimeGeneration.h"
 
+#include <utility>
+
 namespace midigengx::plugin
 {
 
@@ -40,8 +42,8 @@ bool AIRuntimeGeneration::hasProvider() const noexcept
     std::scoped_lock lock(
         modelMutex);
 
-    return static_cast<bool>(
-        modelProvider);
+    return static_cast<bool>(modelProvider) ||
+           static_cast<bool>(conditionedModelProvider);
 }
 
 bool AIRuntimeGeneration::loadModelArtifact(
@@ -66,14 +68,37 @@ bool AIRuntimeGeneration::loadModelArtifact(
     return true;
 }
 
+bool AIRuntimeGeneration::loadConditionedModelArtifact(
+    const midigengx::music::CompositionConditionedSequenceNeuralModelArtifact& artifact)
+{
+    auto candidate =
+        std::make_shared<
+            midigengx::music::CompositionConditionedSequenceNeuralModelRuntimeProvider>();
+
+    if (!candidate->load(
+            artifact))
+    {
+        return false;
+    }
+
+    std::scoped_lock lock(
+        modelMutex);
+
+    conditionedModelProvider =
+        std::move(candidate);
+
+    return true;
+}
+
 bool AIRuntimeGeneration::hasLoadedModel() const noexcept
 {
     std::scoped_lock lock(
         modelMutex);
 
-    return static_cast<bool>(
-               modelProvider) &&
-           modelProvider->isReady();
+    return (static_cast<bool>(modelProvider) &&
+            modelProvider->isReady()) ||
+           (static_cast<bool>(conditionedModelProvider) &&
+            conditionedModelProvider->isReady());
 }
 
 void AIRuntimeGeneration::clearModel()
@@ -82,6 +107,7 @@ void AIRuntimeGeneration::clearModel()
         modelMutex);
 
     modelProvider.reset();
+    conditionedModelProvider.reset();
 }
 
 midigengx::music::Phrase
@@ -116,6 +142,10 @@ AIRuntimeGeneration::generate(
     }
 
     std::shared_ptr<
+        const midigengx::music::CompositionConditionedSequenceNeuralModelRuntimeProvider>
+        currentConditionedModel;
+
+    std::shared_ptr<
         const midigengx::music::CompositionAIModelRuntimeProvider>
         currentModel;
 
@@ -123,8 +153,18 @@ AIRuntimeGeneration::generate(
         std::scoped_lock lock(
             modelMutex);
 
+        currentConditionedModel =
+            conditionedModelProvider;
         currentModel =
             modelProvider;
+    }
+
+    if (currentConditionedModel &&
+        currentConditionedModel->isReady())
+    {
+        return currentConditionedModel->generate(
+            context,
+            seed);
     }
 
     if (currentModel &&
