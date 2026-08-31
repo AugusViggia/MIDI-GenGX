@@ -1,4 +1,4 @@
-﻿cmake_minimum_required(VERSION 3.22)
+cmake_minimum_required(VERSION 3.22)
 
 project(MIDI_GenGX VERSION 0.3.6 LANGUAGES C CXX)
 
@@ -3148,4 +3148,79 @@ set_property(
     TARGET MIDI_GenGX_Phase122GeneratedMidiMusicalMetrics
     PROPERTY
         MSVC_RUNTIME_LIBRARY "MultiThreadedDebugDLL"
+)
+
+
+# -------------------- Built-in Chopin AI generation --------------------
+add_executable(MIDI_GenGX_BuiltInAIChopinGenerationCli
+    Source/Tests/BuiltInAIChopinGenerationCli.cpp
+    Source/Music/BuiltInAIModel.cpp
+)
+
+target_include_directories(
+    MIDI_GenGX_BuiltInAIChopinGenerationCli
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/Source
+        ${CMAKE_CURRENT_BINARY_DIR}/MIDI_GenGX_artefacts/JuceLibraryCode
+        ${CMAKE_CURRENT_SOURCE_DIR}/JUCE/modules
+)
+
+target_link_libraries(
+    MIDI_GenGX_BuiltInAIChopinGenerationCli
+    PRIVATE
+        MIDI_GenGX_Music
+        MIDI_GenGX_BuiltInAIModel
+)
+
+set_property(
+    TARGET MIDI_GenGX_BuiltInAIChopinGenerationCli
+    PROPERTY
+        MSVC_RUNTIME_LIBRARY "MultiThreadedDebugDLL"
+)
+
+add_test(
+    NAME MIDI_GenGX_BuiltInAIChopinGenerationCli
+    COMMAND MIDI_GenGX_BuiltInAIChopinGenerationCli
+)
+
+# -------------------- Phase 125 built-in Chopin AI plugin selector E2E --------------------
+add_executable(MIDI_GenGX_BuiltInAIChopinPluginSelectorE2ETests
+    Source/Tests/BuiltInAIChopinPluginSelectorE2ETests.cpp
+)
+
+target_include_directories(
+    MIDI_GenGX_BuiltInAIChopinPluginSelectorE2ETests
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/Source
+        ${CMAKE_CURRENT_BINARY_DIR}/MIDI_GenGX_artefacts/JuceLibraryCode
+        ${CMAKE_CURRENT_SOURCE_DIR}/JUCE/modules
+)
+
+target_link_libraries(
+    MIDI_GenGX_BuiltInAIChopinPluginSelectorE2ETests
+    PRIVATE
+        MIDI_GenGX
+        MIDI_GenGX_BuiltInAIModel
+        juce::juce_audio_processors
+        juce::juce_audio_basics
+        juce::juce_core
+)
+
+target_compile_definitions(
+    MIDI_GenGX_BuiltInAIChopinPluginSelectorE2ETests
+    PRIVATE
+        JUCE_WEB_BROWSER=0
+        JUCE_USE_CURL=0
+        JUCE_VST3_CAN_REPLACE_VST2=0
+)
+
+set_property(
+    TARGET MIDI_GenGX_BuiltInAIChopinPluginSelectorE2ETests
+    PROPERTY
+        MSVC_RUNTIME_LIBRARY "MultiThreadedDebugDLL"
+)
+
+add_test(
+    NAME MIDI_GenGX_BuiltInAIChopinPluginSelectorE2ETests
+    COMMAND MIDI_GenGX_BuiltInAIChopinPluginSelectorE2ETests
 )
