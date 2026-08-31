@@ -419,6 +419,45 @@ void testKeyChangeChangesFinalPitchSpaceForSameSeed()
            "changing C minor to G minor changes final pitch space");
 }
 
+void testLeadControlsLargeMelodicLeaps()
+{
+    auto context = baseContext();
+    context.key = Key::C;
+    context.scale = Scale{ScaleType::Major};
+    context.role = Role::Lead;
+    context.parameters.lengthBars = 4;
+    context.parameters.phraseLengthBars = 4;
+    context.parameters.octaveLow =
+        AbletonOctaveConvention::abletonOctaveToInternal(1);
+    context.parameters.octaveHigh =
+        AbletonOctaveConvention::abletonOctaveToInternal(8);
+    context.parameters.density = 80;
+    context.parameters.tension = 0;
+    context.parameters.complexity = 0;
+    context.parameters.variation = 25;
+    context.parameters.octaveMovement = 100;
+
+    MusicalEngine engine;
+    const auto phrase = engine.generate(context, 24680);
+
+    expect(!phrase.notes.empty(),
+           "large-leap control test produces notes");
+
+    int largestLeap = 0;
+    for (std::size_t i = 1; i < phrase.notes.size(); ++i)
+    {
+        largestLeap = std::max(
+            largestLeap,
+            std::abs(
+                phrase.notes[i].midiNote -
+                phrase.notes[i - 1].midiNote));
+    }
+
+    expect(
+        largestLeap <= 7,
+        "low tension and complexity keep melodic leaps within a fifth");
+}
+
 void testDensityControlsNoteCount()
 {
     auto low = baseContext();
@@ -2810,6 +2849,62 @@ void testPhraseValidity()
 
 } // namespace
 
+
+void testLeadUsesStructuredDiatonicMotion()
+{
+    auto context = baseContext();
+    context.key = Key::C;
+    context.scale = Scale{ScaleType::Major};
+    context.role = Role::Lead;
+    context.parameters.octaveLow =
+        AbletonOctaveConvention::abletonOctaveToInternal(1);
+    context.parameters.octaveHigh =
+        AbletonOctaveConvention::abletonOctaveToInternal(4);
+    context.parameters.lengthBars = 4;
+    context.parameters.phraseLengthBars = 4;
+    context.parameters.density = 60;
+    context.parameters.tension = 45;
+    context.parameters.variation = 35;
+    context.parameters.complexity = 35;
+
+    MusicalEngine engine;
+    const auto phrase = engine.generate(context, 8127);
+
+    expect(phrase.notes.size() >= 4,
+           "structured melody produces enough notes");
+
+    const auto allowed =
+        context.scale.getPitchClasses(toPitchClass(context.key));
+
+    std::vector<int> degrees;
+    for (const auto& note : phrase.notes)
+    {
+        const int pitchClass =
+            ((note.midiNote % 12) + 12) % 12;
+        const auto it =
+            std::find(allowed.begin(), allowed.end(), pitchClass);
+
+        expect(it != allowed.end(),
+               "structured melody remains diatonic");
+
+        degrees.push_back(
+            static_cast<int>(std::distance(allowed.begin(), it)));
+    }
+
+    bool hasRepeatedDegree = false;
+    bool hasLeap = false;
+    for (std::size_t i = 1; i < degrees.size(); ++i)
+    {
+        hasRepeatedDegree |=
+            degrees[i] == degrees[i - 1];
+        hasLeap |=
+            std::abs(degrees[i] - degrees[i - 1]) > 1;
+    }
+
+    expect(hasRepeatedDegree || hasLeap,
+           "lead is not a fixed ascending scale walk");
+}
+
 int main()
 {
     testDeterministicGeneration();
@@ -2824,6 +2919,7 @@ int main()
     testVariationChangesLaterMotif();
     testRepetitionControlChangesPhraseReuse();
     testComplexityAffectsPitchChoices();
+    testLeadControlsLargeMelodicLeaps();
     testExplicitNoteLengthAffectsDuration();
     testHumanizationChangesTimingDeterministically();
     testCadenceRootEndsOnRootPitchClass();
@@ -2854,7 +2950,10 @@ int main()
     testPhraseAnalysis();
     testGenerationIntentNormalization();
     testRoleSpecificGeneration();
+    testLeadUsesStructuredDiatonicMotion();
 
     std::cout << "MIDI-GenGX Musical Engine tests passed.\n";
     return 0;
 }
+
+

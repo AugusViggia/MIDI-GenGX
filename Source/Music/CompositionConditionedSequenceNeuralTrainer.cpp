@@ -1,3 +1,4 @@
+
 #include "CompositionConditionedSequenceNeuralTrainer.h"
 
 #include <algorithm>
@@ -38,6 +39,16 @@ double clipValue(
         value,
         -clip,
         clip);
+}
+
+double featureLossWeight(
+    const std::size_t featureIndex,
+    const CompositionConditionedSequenceNeuralTrainingConfig& config) noexcept
+{
+    if (featureIndex == 0) return config.pitchLossWeight;
+    if (featureIndex == 1) return config.velocityLossWeight;
+    if (featureIndex == 2 || featureIndex == 3) return config.timingLossWeight;
+    return config.auxiliaryLossWeight;
 }
 
 Gradients makeGradients(
@@ -112,7 +123,8 @@ double trainWindow(
     CompositionConditionedSequenceNeuralModel& model,
     const CompositionMidiSequenceWindow& window,
     const CompositionConditionedTrainingSample& sample,
-    Gradients& gradients)
+    Gradients& gradients,
+    const CompositionConditionedSequenceNeuralTrainingConfig& config)
 {
     const auto width =
         model.contract.inputFeatureWidth;
@@ -329,13 +341,13 @@ double trainWindow(
             output -
             window.targets[row];
 
+        const auto weight = featureLossWeight(row, config);
+
         loss +=
-            error *
-            error;
+            weight * error * error;
 
         const auto gradient =
-            error *
-            outputScale;
+            weight * error * outputScale;
 
         for (std::size_t column = 0;
              column <
@@ -495,9 +507,11 @@ double trainWindow(
             workspace.nextDh);
     }
 
-    return loss /
-           static_cast<double>(
-               targetWidth);
+    double totalWeight = 0.0;
+    for (std::size_t row = 0; row < targetWidth; ++row)
+        totalWeight += featureLossWeight(row, config);
+
+    return loss / std::max(totalWeight, 1.0);
 }
 
 template <typename Vector>
@@ -599,6 +613,21 @@ void applyGradients(
 
 } // namespace
 
+double CompositionConditionedSequenceNeuralTrainingConfig::lossWeightForFeature(
+    const std::size_t featureIndex) const noexcept
+{
+    if (featureIndex == 0)
+        return pitchLossWeight;
+
+    if (featureIndex == 1)
+        return velocityLossWeight;
+
+    if (featureIndex == 2 || featureIndex == 3)
+        return timingLossWeight;
+
+    return auxiliaryLossWeight;
+}
+
 bool CompositionConditionedSequenceNeuralTrainingResult::isValid()
     const noexcept
 {
@@ -625,7 +654,15 @@ trainCompositionConditionedSequenceNeuralModel(
         config.learningRate <= 0.0 ||
         !finiteValue(config.gradientClip) ||
         config.gradientClip <= 0.0 ||
-        config.evaluationInterval == 0)
+        config.evaluationInterval == 0 ||
+        !finiteValue(config.pitchLossWeight) ||
+        !finiteValue(config.timingLossWeight) ||
+        !finiteValue(config.velocityLossWeight) ||
+        !finiteValue(config.auxiliaryLossWeight) ||
+        config.pitchLossWeight <= 0.0 ||
+        config.timingLossWeight <= 0.0 ||
+        config.velocityLossWeight <= 0.0 ||
+        config.auxiliaryLossWeight <= 0.0)
     {
         return result;
     }
@@ -696,10 +733,16 @@ trainCompositionConditionedSequenceNeuralModel(
                 }
             }
 
+            double totalWeight = 0.0;
+            for (std::size_t index = 0;
+                 index < model.contract.targetFeatureWidth;
+                 ++index)
+                totalWeight += featureLossWeight(index, config);
+
             return total /
-                   static_cast<double>(
-                       examples.size() *
-                       model.contract.targetFeatureWidth);
+                   std::max(
+                       static_cast<double>(examples.size()) * totalWeight,
+                       1.0);
         };
 
     result.initialLoss =
@@ -790,7 +833,8 @@ trainCompositionConditionedSequenceNeuralModel(
                             model,
                             examples[exampleIndex].window,
                             *examples[exampleIndex].sample,
-                            workerGradients[workerIndex]);
+                            workerGradients[workerIndex],
+                            config);
                     }
                 });
         }
@@ -942,3 +986,4 @@ trainCompositionConditionedSequenceNeuralModel(
 }
 
 } // namespace midigengx::music
+

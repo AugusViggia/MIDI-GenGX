@@ -1,3 +1,4 @@
+
 #pragma once
 
 #include "CompositionConditionedTrainingDataset.h"
@@ -20,6 +21,19 @@ struct CompositionConditionedSequenceNeuralTrainingConfig
 
     // Full loss evaluation every N epochs.
     std::size_t evaluationInterval = 1;
+
+    // Structured weighting for the current 20-feature event representation.
+    // Pitch and timing are the primary compositional targets; velocity is
+    // secondary; auxiliary features remain lower-weighted until their
+    // semantics are upgraded in the next output-head phase.
+    double pitchLossWeight = 3.0;
+    double timingLossWeight = 2.0;
+    double velocityLossWeight = 1.0;
+    double auxiliaryLossWeight = 0.25;
+
+    // Returns the effective loss weight for the fixed-width event representation.
+    // This is intentionally exposed for focused validation of the training contract.
+    double lossWeightForFeature(std::size_t featureIndex) const noexcept;
 
     // Optional (epoch, totalEpochs, epochLoss) callback.
     std::function<void(
@@ -46,3 +60,4 @@ trainCompositionConditionedSequenceNeuralModel(
     const CompositionConditionedSequenceNeuralTrainingConfig& config) noexcept;
 
 } // namespace midigengx::music
+

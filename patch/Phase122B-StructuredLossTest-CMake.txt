@@ -1,0 +1,28 @@
+
+# -------------------- Phase 122B structured loss tests --------------------
+add_executable(MIDI_GenGX_CompositionConditionedStructuredLossTests
+    Source/Tests/CompositionConditionedStructuredLossTests.cpp
+)
+
+target_include_directories(
+    MIDI_GenGX_CompositionConditionedStructuredLossTests
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/Source
+)
+
+target_link_libraries(
+    MIDI_GenGX_CompositionConditionedStructuredLossTests
+    PRIVATE
+        MIDI_GenGX_Music
+)
+
+set_property(
+    TARGET MIDI_GenGX_CompositionConditionedStructuredLossTests
+    PROPERTY
+        MSVC_RUNTIME_LIBRARY "MultiThreadedDebugDLL"
+)
+
+add_test(
+    NAME MIDI_GenGX_CompositionConditionedStructuredLossTests
+    COMMAND MIDI_GenGX_CompositionConditionedStructuredLossTests
+)

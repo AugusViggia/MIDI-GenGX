@@ -1,3 +1,4 @@
+
 #include "MusicalEngine.h"
 #include "MelodicContour.h"
 
@@ -168,6 +169,43 @@ int MusicalEngine::chooseNearestScalePitch(
     }
 
     return clampMidi(best);
+}
+
+int constrainMelodicLeap(
+    int pitch,
+    int previousPitch,
+    int maxLeapSemitones,
+    const std::vector<int>& pitchPool)
+{
+    if (pitchPool.empty() || previousPitch < 0)
+        return pitch;
+
+    if (std::abs(pitch - previousPitch) <= maxLeapSemitones)
+        return pitch;
+
+    int best = pitch;
+    int bestScore = 1000000;
+
+    for (const int candidate : pitchPool)
+    {
+        const int distanceFromPrevious =
+            std::abs(candidate - previousPitch);
+
+        if (distanceFromPrevious > maxLeapSemitones)
+            continue;
+
+        const int score =
+            std::abs(candidate - pitch) * 4 +
+            distanceFromPrevious;
+
+        if (score < bestScore)
+        {
+            best = candidate;
+            bestScore = score;
+        }
+    }
+
+    return best;
 }
 
 std::vector<int> MusicalEngine::buildScalePitchPool(
@@ -387,6 +425,109 @@ double MusicalEngine::noteDurationBeats(
         requested,
         0.05,
         std::max(0.05, availableBeats - 0.02));
+}
+
+
+int chooseComposedScaleIndex(
+    int previousScaleIndex,
+    int scaleSize,
+    int tension,
+    int variation,
+    int complexity,
+    int localStep,
+    bool phraseStart,
+    bool phraseEnd,
+    std::mt19937& rng)
+{
+    if (scaleSize <= 0)
+        return 0;
+
+    previousScaleIndex = std::clamp(previousScaleIndex, 0, scaleSize - 1);
+    tension = clampPercent(tension);
+    variation = clampPercent(variation);
+    complexity = clampPercent(complexity);
+
+    if (phraseStart)
+        return 0;
+
+    const bool strongBeat = (localStep % 4) == 0;
+
+    // Strong beats favor stable diatonic degrees while weak beats favor
+    // neighboring scale degrees. This creates tonal gravity without a fixed
+    // 0-1-2-3... scale walk.
+    if (strongBeat && scaleSize >= 3 && !phraseEnd)
+    {
+        const int anchors[] =
+        {
+            0,
+            std::min(2, scaleSize - 1),
+            std::min(4, scaleSize - 1)
+        };
+
+        std::vector<int> nearbyAnchors;
+        for (const int degree : anchors)
+        {
+            if (std::abs(degree - previousScaleIndex) <=
+                1 + (complexity >= 60 ? 1 : 0))
+            {
+                nearbyAnchors.push_back(degree);
+            }
+        }
+
+        const int anchorChance =
+            std::clamp(55 + complexity / 3 - variation / 5, 20, 80);
+
+        if (!nearbyAnchors.empty() &&
+            std::uniform_int_distribution<int>(0, 99)(rng) < anchorChance)
+        {
+            std::uniform_int_distribution<int> pick(
+                0, static_cast<int>(nearbyAnchors.size()) - 1);
+            return nearbyAnchors[static_cast<std::size_t>(pick(rng))];
+        }
+    }
+
+    const int maxStep =
+        tension < 30 ? 1 :
+        tension < 65 ? 2 :
+        std::min(3, scaleSize - 1);
+
+    std::vector<int> candidates;
+    for (int delta = -maxStep; delta <= maxStep; ++delta)
+    {
+        if (delta == 0)
+            continue;
+        const int candidate = previousScaleIndex + delta;
+        if (candidate >= 0 && candidate < scaleSize)
+            candidates.push_back(candidate);
+    }
+
+    if (candidates.empty())
+        return previousScaleIndex;
+
+    const int stepwiseChance =
+        std::clamp(78 - variation / 3 + complexity / 8, 45, 90);
+
+    if (maxStep > 1 &&
+        std::uniform_int_distribution<int>(0, 99)(rng) < stepwiseChance)
+    {
+        std::vector<int> stepwise;
+        for (const int candidate : candidates)
+        {
+            if (std::abs(candidate - previousScaleIndex) == 1)
+                stepwise.push_back(candidate);
+        }
+
+        if (!stepwise.empty())
+        {
+            std::uniform_int_distribution<int> pick(
+                0, static_cast<int>(stepwise.size()) - 1);
+            return stepwise[static_cast<std::size_t>(pick(rng))];
+        }
+    }
+
+    std::uniform_int_distribution<int> pick(
+        0, static_cast<int>(candidates.size()) - 1);
+    return candidates[static_cast<std::size_t>(pick(rng))];
 }
 
 int MusicalEngine::chooseScaleIndexNear(
@@ -895,6 +1036,9 @@ Phrase MusicalEngine::generateLead(
     int previousScaleIndex =
         0;
 
+    int previousMidiNote =
+        -1;
+
     std::vector<int> motifScaleIndices(
         motifSteps.size(),
         0);
@@ -936,70 +1080,40 @@ Phrase MusicalEngine::generateLead(
 
             if (phraseIndex == 0)
             {
-                if (motifIndex > 0 &&
-                    params.complexity > 0)
-                {
-                    const int effectiveTension =
-                        std::clamp(
-                            params.tension +
-                            params.complexity / 2,
-                            0,
-                            100);
+                scaleIndex =
+                    chooseComposedScaleIndex(
+                        previousScaleIndex,
+                        scaleSize,
+                        params.tension,
+                        params.variation,
+                        params.complexity,
+                        localStep,
+                        motifIndex == 0,
+                        motifIndex + 1 == motifSteps.size(),
+                        rng);
 
-                    const int effectiveVariation =
-                        std::clamp(
-                            params.variation +
-                            params.complexity,
-                            0,
-                            100);
-
-                    scaleIndex =
-                        chooseScaleIndexNear(
-                            previousScaleIndex,
-                            scaleSize,
-                            effectiveTension,
-                            effectiveVariation,
-                            rng);
-                }
-
-                if (params.catchiness >= 70 &&
-                    (localStep % 4) == 0)
-                {
-                    scaleIndex =
-                        std::min(
-                            scaleSize - 1,
-                            static_cast<int>(
-                                (motifIndex % 3) * 2));
-                }
-
-                motifScaleIndices[motifIndex] =
-                    scaleIndex;
+                motifScaleIndices[motifIndex] = scaleIndex;
             }
             else
             {
-                scaleIndex =
-                    motifScaleIndices[motifIndex];
+                scaleIndex = motifScaleIndices[motifIndex];
 
                 const int changeProbability =
                     100 - params.repetition;
 
                 if (changeProbability > 0 &&
-                    percentageRoll(rng) <
-                        changeProbability)
+                    percentageRoll(rng) < changeProbability)
                 {
-                    const int effectiveVariation =
-                        std::clamp(
-                            params.variation +
-                            params.complexity / 2,
-                            0,
-                            100);
-
                     scaleIndex =
-                        chooseScaleIndexNear(
+                        chooseComposedScaleIndex(
                             scaleIndex,
                             scaleSize,
                             params.tension,
-                            effectiveVariation,
+                            params.variation,
+                            params.complexity,
+                            localStep,
+                            false,
+                            motifIndex + 1 == motifSteps.size(),
                             rng);
                 }
             }
@@ -1137,7 +1251,23 @@ Phrase MusicalEngine::generateLead(
                 }
             }
 
+            const int maxMelodicLeap =
+                std::clamp(
+                    7 +
+                    params.tension / 25 +
+                    params.complexity / 25,
+                    7,
+                    12);
+
+            midi =
+                constrainMelodicLeap(
+                    midi,
+                    previousMidiNote,
+                    maxMelodicLeap,
+                    pitchPool);
+
             previousScaleIndex = scaleIndex;
+            previousMidiNote = midi;
 
             // Determine available duration from the next motif onset.
             double nextBeat =
@@ -1286,3 +1416,5 @@ Phrase MusicalEngine::generateLead(
 
 
 } // namespace midigengx::music
+
+
