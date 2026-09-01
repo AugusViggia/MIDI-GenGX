@@ -11,7 +11,7 @@ namespace midigengx::music
 struct CompositionConditionedSequenceNeuralModelArtifact
 {
     static constexpr std::uint32_t magic = 0x4D47434Eu; // "MGCN"
-    static constexpr std::uint32_t version = 2;
+    static constexpr std::uint32_t version = 3;
 
     std::vector<std::uint8_t> bytes;
 

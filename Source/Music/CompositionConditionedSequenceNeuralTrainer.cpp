@@ -25,6 +25,7 @@ struct Gradients
     std::vector<double> styleEmbeddings;
     std::vector<double> eraEmbeddings;
     std::vector<double> instrumentationEmbeddings;
+    std::vector<double> knowledgeProjectionWeights;
 };
 
 bool finiteValue(double value) noexcept
@@ -66,6 +67,7 @@ Gradients makeGradients(
     g.styleEmbeddings.assign(model.styleEmbeddings.size(), 0.0);
     g.eraEmbeddings.assign(model.eraEmbeddings.size(), 0.0);
     g.instrumentationEmbeddings.assign(model.instrumentationEmbeddings.size(), 0.0);
+    g.knowledgeProjectionWeights.assign(model.knowledgeProjectionWeights.size(), 0.0);
 
     return g;
 }
@@ -82,7 +84,8 @@ void clearGradients(Gradients& g) noexcept
              &g.composerEmbeddings,
              &g.styleEmbeddings,
              &g.eraEmbeddings,
-             &g.instrumentationEmbeddings
+             &g.instrumentationEmbeddings,
+              &g.knowledgeProjectionWeights
          })
     {
         std::fill(values->begin(), values->end(), 0.0);
@@ -116,6 +119,9 @@ void accumulateGradients(
     accumulateGradientVectors(
         destination.instrumentationEmbeddings,
         source.instrumentationEmbeddings);
+    accumulateGradientVectors(
+        destination.knowledgeProjectionWeights,
+        source.knowledgeProjectionWeights);
 }
 
 template <typename Vector>
@@ -208,6 +214,13 @@ void applyScaledClippedGradients(
     applyScaledClippedVector(
         model.instrumentationEmbeddings,
         gradients.instrumentationEmbeddings,
+        scale,
+        clip,
+        learningRate);
+
+    applyScaledClippedVector(
+        model.knowledgeProjectionWeights,
+        gradients.knowledgeProjectionWeights,
         scale,
         clip,
         learningRate);
@@ -546,6 +559,23 @@ double trainWindow(
                 gradients.instrumentationEmbeddings,
                 sample.instrumentationIndex,
                 workspace.dh);
+
+            for (std::size_t dimension = 0;
+                 dimension < CompositionConditionedSequenceNeuralModel::knowledgeEmbeddingWidth;
+                 ++dimension)
+            {
+                const auto gradient = workspace.dh[dimension];
+                const auto base =
+                    dimension * CompositionConditionedSequenceNeuralModel::knowledgeFeatureCount;
+
+                for (std::size_t feature = 0;
+                     feature < CompositionConditionedSequenceNeuralModel::knowledgeFeatureCount;
+                     ++feature)
+                {
+                    gradients.knowledgeProjectionWeights[base + feature] +=
+                        gradient * sample.knowledgeFeatures[feature];
+                }
+            }
         }
 
         std::fill(

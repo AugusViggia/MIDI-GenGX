@@ -10,7 +10,7 @@ namespace
 {
 
 constexpr std::size_t headerSize =
-    sizeof(std::uint32_t) * 13;
+    sizeof(std::uint32_t) * 15;
 
 void writeU32(
     std::vector<std::uint8_t>& bytes,
@@ -248,6 +248,8 @@ bool CompositionConditionedSequenceNeuralModelArtifact::isValid()
     std::uint32_t targetWidth = 0;
     std::uint32_t hiddenWidth = 0;
     std::uint32_t embeddingWidth = 0;
+    std::uint32_t knowledgeFeatureCount = 0;
+    std::uint32_t knowledgeEmbeddingWidth = 0;
     std::uint32_t composerCount = 0;
     std::uint32_t styleCount = 0;
     std::uint32_t eraCount = 0;
@@ -261,6 +263,8 @@ bool CompositionConditionedSequenceNeuralModelArtifact::isValid()
         !readU32(bytes, offset, targetWidth) ||
         !readU32(bytes, offset, hiddenWidth) ||
         !readU32(bytes, offset, embeddingWidth) ||
+        !readU32(bytes, offset, knowledgeFeatureCount) ||
+        !readU32(bytes, offset, knowledgeEmbeddingWidth) ||
         !readU32(bytes, offset, composerCount) ||
         !readU32(bytes, offset, styleCount) ||
         !readU32(bytes, offset, eraCount))
@@ -286,6 +290,10 @@ bool CompositionConditionedSequenceNeuralModelArtifact::isValid()
             CompositionConditionedSequenceNeuralModel::hiddenWidth ||
         embeddingWidth !=
             CompositionConditionedSequenceNeuralModel::conditionEmbeddingWidth ||
+        knowledgeFeatureCount !=
+            CompositionConditionedSequenceNeuralModel::knowledgeFeatureCount ||
+        knowledgeEmbeddingWidth !=
+            CompositionConditionedSequenceNeuralModel::knowledgeEmbeddingWidth ||
         composerCount == 0 ||
         styleCount == 0 ||
         eraCount == 0)
@@ -363,6 +371,17 @@ bool CompositionConditionedSequenceNeuralModelArtifact::isValid()
                 composerCount),
             static_cast<std::size_t>(
                 embeddingWidth),
+            temporary))
+    {
+        return false;
+    }
+
+    parameterCount +=
+        temporary;
+
+    if (!safeMultiply(
+            CompositionConditionedSequenceNeuralModel::knowledgeEmbeddingWidth,
+            CompositionConditionedSequenceNeuralModel::knowledgeFeatureCount,
             temporary))
     {
         return false;
@@ -652,6 +671,18 @@ serializeCompositionConditionedSequenceNeuralModel(
         static_cast<std::uint32_t>(
             counts[3]));
 
+    writeU32(
+        artifact.bytes,
+        offset,
+        static_cast<std::uint32_t>(
+            CompositionConditionedSequenceNeuralModel::knowledgeFeatureCount));
+
+    writeU32(
+        artifact.bytes,
+        offset,
+        static_cast<std::uint32_t>(
+            CompositionConditionedSequenceNeuralModel::knowledgeEmbeddingWidth));
+
     const std::vector<double>* parameters[] =
     {
         &model.inputWeights,
@@ -662,7 +693,8 @@ serializeCompositionConditionedSequenceNeuralModel(
         &model.composerEmbeddings,
         &model.styleEmbeddings,
         &model.eraEmbeddings,
-        &model.instrumentationEmbeddings
+        &model.instrumentationEmbeddings,
+        &model.knowledgeProjectionWeights
     };
 
     for (const auto* parameter :
@@ -710,11 +742,11 @@ bool deserializeCompositionConditionedSequenceNeuralModel(
         return false;
 
     constexpr std::size_t headerSize =
-        sizeof(std::uint32_t) * 13;
+        sizeof(std::uint32_t) * 15;
 
     std::size_t headerOffset = 0;
 
-    std::uint32_t values[13] =
+    std::uint32_t values[15] =
     {
         0
     };
@@ -749,17 +781,23 @@ bool deserializeCompositionConditionedSequenceNeuralModel(
         return false;
     }
 
+    if (values[9] != CompositionConditionedSequenceNeuralModel::knowledgeFeatureCount ||
+        values[10] != CompositionConditionedSequenceNeuralModel::knowledgeEmbeddingWidth)
+    {
+        return false;
+    }
+
     const std::size_t composerCount =
-        static_cast<std::size_t>(values[9]);
-
-    const std::size_t styleCount =
-        static_cast<std::size_t>(values[10]);
-
-    const std::size_t eraCount =
         static_cast<std::size_t>(values[11]);
 
-    const std::size_t instrumentationCount =
+    const std::size_t styleCount =
         static_cast<std::size_t>(values[12]);
+
+    const std::size_t eraCount =
+        static_cast<std::size_t>(values[13]);
+
+    const std::size_t instrumentationCount =
+        static_cast<std::size_t>(values[14]);
 
     const std::size_t hidden =
         static_cast<std::size_t>(
@@ -1000,6 +1038,11 @@ bool deserializeCompositionConditionedSequenceNeuralModel(
             parameterOffset,
             candidate.instrumentationEmbeddings.size(),
             candidate.instrumentationEmbeddings) ||
+        !readVector(
+            artifact.bytes,
+            parameterOffset,
+            candidate.knowledgeProjectionWeights.size(),
+            candidate.knowledgeProjectionWeights) ||
         parameterOffset != stringOffset)
     {
         return false;

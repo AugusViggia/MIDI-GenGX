@@ -121,6 +121,8 @@ void testParametersAndVocabularyUseDistinctRegions()
             original.inputWeights &&
         restored.outputWeights ==
             original.outputWeights &&
+        restored.knowledgeProjectionWeights ==
+            original.knowledgeProjectionWeights &&
         restored.vocabulary.composers ==
             original.vocabulary.composers &&
         restored.vocabulary.instrumentations ==

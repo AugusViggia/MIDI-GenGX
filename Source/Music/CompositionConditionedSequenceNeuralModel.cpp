@@ -206,7 +206,9 @@ bool CompositionConditionedSequenceNeuralModel::isValid()
                 vocabulary.eras.size()) ||
         instrumentationEmbeddings.size() !=
             embeddingSize(
-                vocabulary.instrumentations.size()))
+                vocabulary.instrumentations.size()) ||
+        knowledgeProjectionWeights.size() !=
+            CompositionConditionedSequenceNeuralModel::knowledgeEmbeddingWidth * CompositionConditionedSequenceNeuralModel::knowledgeFeatureCount)
     {
         return false;
     }
@@ -219,7 +221,8 @@ bool CompositionConditionedSequenceNeuralModel::isValid()
            allFinite(composerEmbeddings) &&
            allFinite(styleEmbeddings) &&
            allFinite(eraEmbeddings) &&
-           allFinite(instrumentationEmbeddings);
+           allFinite(instrumentationEmbeddings) &&
+           allFinite(knowledgeProjectionWeights);
 }
 
 CompositionConditionedSequenceNeuralModel
@@ -374,6 +377,27 @@ initializeCompositionConditionedSequenceNeuralModel(
         vocabulary.instrumentations.size(),
         embeddingScale);
 
+    model.knowledgeProjectionWeights.assign(
+        CompositionConditionedSequenceNeuralModel::knowledgeEmbeddingWidth * CompositionConditionedSequenceNeuralModel::knowledgeFeatureCount,
+        0.0);
+
+    for (std::size_t dimension = 0;
+         dimension < CompositionConditionedSequenceNeuralModel::knowledgeEmbeddingWidth;
+         ++dimension)
+    {
+        for (std::size_t feature = 0;
+             feature < CompositionConditionedSequenceNeuralModel::knowledgeFeatureCount;
+             ++feature)
+        {
+            const auto pattern =
+                static_cast<int>((dimension * 17 + feature * 31) % 41) - 20;
+
+            model.knowledgeProjectionWeights[
+                dimension * CompositionConditionedSequenceNeuralModel::knowledgeFeatureCount + feature] =
+                static_cast<double>(pattern) * 0.01;
+        }
+    }
+
     model.initialized =
         true;
 
@@ -421,6 +445,26 @@ bool CompositionConditionedSequenceNeuralModel::predictNextEventInto(
         sample.eraIndex,
         instrumentationEmbeddings,
         sample.instrumentationIndex);
+
+    for (std::size_t dimension = 0;
+         dimension < CompositionConditionedSequenceNeuralModel::knowledgeEmbeddingWidth;
+         ++dimension)
+    {
+        double sum = 0.0;
+        const auto base =
+            dimension * CompositionConditionedSequenceNeuralModel::knowledgeFeatureCount;
+
+        for (std::size_t feature = 0;
+             feature < CompositionConditionedSequenceNeuralModel::knowledgeFeatureCount;
+             ++feature)
+        {
+            sum +=
+                knowledgeProjectionWeights[base + feature] *
+                sample.knowledgeFeatures[feature];
+        }
+
+        hidden[dimension] += sum;
+    }
 
     for (std::size_t time = 0;
          time < contract.contextLength;

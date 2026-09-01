@@ -3,6 +3,7 @@
 #include "CompositionMidiTrainingSequence.h"
 #include "CompositionSequenceMetadata.h"
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 
@@ -18,6 +19,9 @@ struct CompositionConditionedTrainingSample
     std::uint32_t styleIndex = 0;
     std::uint32_t eraIndex = 0;
     std::uint32_t instrumentationIndex = 0;
+
+    static constexpr std::size_t knowledgeFeatureCount = 37;
+    std::array<double, knowledgeFeatureCount> knowledgeFeatures{};
 
     bool valid = false;
 

@@ -110,19 +110,32 @@ CompositionConditionedTrainingDataset buildDataset()
                 "solo_piano")
         });
 
-    return buildCompositionConditionedTrainingDataset(
-        {
-            makeSequence(
-                "piece-a",
-                0.0),
-            makeSequence(
-                "piece-b",
-                0.02),
-            makeSequence(
-                "piece-c",
-                0.01)
-        },
-        metadataCatalog);
+    auto dataset =
+        buildCompositionConditionedTrainingDataset(
+            {
+                makeSequence(
+                    "piece-a",
+                    0.0),
+                makeSequence(
+                    "piece-b",
+                    0.02),
+                makeSequence(
+                    "piece-c",
+                    0.01)
+            },
+            metadataCatalog);
+
+    for (auto& sample : dataset.samples)
+    {
+        const double value =
+            sample.sequence.sampleId == "piece-a"
+                ? 0.25
+                : (sample.sequence.sampleId == "piece-b" ? 0.75 : 0.50);
+
+        sample.knowledgeFeatures.fill(value);
+    }
+
+    return dataset;
 }
 
 void testModelInitialization()
@@ -204,6 +217,24 @@ void testPredictionUsesCondition()
         firstPrediction.features !=
             secondPrediction.features,
         "different style/composer conditions affect prediction");
+
+    auto knowledgeA = first;
+    auto knowledgeB = first;
+    knowledgeA.knowledgeFeatures.fill(0.0);
+    knowledgeB.knowledgeFeatures.fill(1.0);
+
+    const auto predictionA =
+        model.predictNextEvent(
+            firstWindows.front(),
+            knowledgeA);
+    const auto predictionB =
+        model.predictNextEvent(
+            firstWindows.front(),
+            knowledgeB);
+
+    expect(
+        predictionA.features != predictionB.features,
+        "continuous knowledge conditioning affects prediction");
 }
 
 void testTrainingReducesLoss()
@@ -295,6 +326,11 @@ void testTrainingIsDeterministic()
         firstModel.composerEmbeddings ==
             secondModel.composerEmbeddings,
         "condition embeddings train deterministically");
+
+    expect(
+        firstModel.knowledgeProjectionWeights ==
+            secondModel.knowledgeProjectionWeights,
+        "knowledge projection trains deterministically");
 }
 
 } // namespace

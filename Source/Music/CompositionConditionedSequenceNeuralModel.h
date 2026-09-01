@@ -24,6 +24,8 @@ struct CompositionConditionedSequenceNeuralModel
     static constexpr int version = 1;
     static constexpr std::size_t hiddenWidth = 64;
     static constexpr std::size_t conditionEmbeddingWidth = 8;
+    static constexpr std::size_t knowledgeFeatureCount = 37;
+    static constexpr std::size_t knowledgeEmbeddingWidth = 8;
 
     CompositionSequenceLearningContract contract;
     CompositionConditioningVocabulary vocabulary;
@@ -40,6 +42,10 @@ struct CompositionConditionedSequenceNeuralModel
     std::vector<double> styleEmbeddings;
     std::vector<double> eraEmbeddings;
     std::vector<double> instrumentationEmbeddings;
+
+    // Trainable projection from continuous compositional knowledge into the
+    // first knowledgeEmbeddingWidth hidden dimensions.
+    std::vector<double> knowledgeProjectionWeights;
 
     bool initialized = false;
 
