@@ -5,9 +5,6 @@
 
 namespace midigengx::music
 {
-namespace
-{
-} // namespace
 
 bool CompositionMidiSequenceWindow::isValid(
     const CompositionSequenceLearningContract& contract)
@@ -62,10 +59,106 @@ bool CompositionMidiSequenceWindow::isValid(
         if (!std::isfinite(value) ||
             value < 0.0 ||
             value > 1.0)
+        {
             return false;
+        }
     }
 
     return true;
+}
+
+CompositionMidiSequenceWindow
+buildCompositionMidiSequenceWindow(
+    const CompositionMidiTrainingSequence& sequence,
+    const CompositionSequenceLearningContract& contract,
+    const std::size_t targetIndex)
+    noexcept
+{
+    CompositionMidiSequenceWindow window;
+
+    if (!sequence.isValid() ||
+        !contract.isValid() ||
+        sequence.featureWidth !=
+            contract.inputFeatureWidth ||
+        targetIndex == 0 ||
+        targetIndex >= sequence.events.size())
+    {
+        return window;
+    }
+
+    const auto width =
+        contract.inputFeatureWidth;
+
+    const auto contextLength =
+        contract.contextLength;
+
+    window.contextLength =
+        contextLength;
+
+    window.featureWidth =
+        width;
+
+    window.inputs.assign(
+        contextLength * width,
+        0.0);
+
+    window.targets =
+        sequence.events[
+            targetIndex].features;
+
+    window.paddingMask.assign(
+        contextLength,
+        0.0);
+
+    const auto firstContextIndex =
+        targetIndex > contextLength
+            ? targetIndex - contextLength
+            : 0;
+
+    const auto available =
+        targetIndex -
+        firstContextIndex;
+
+    const auto padding =
+        contextLength -
+        available;
+
+    for (std::size_t contextIndex = 0;
+         contextIndex < available;
+         ++contextIndex)
+    {
+        const auto sourceIndex =
+            firstContextIndex +
+            contextIndex;
+
+        const auto destinationIndex =
+            padding +
+            contextIndex;
+
+        std::copy(
+            sequence.events[
+                sourceIndex].features.begin(),
+            sequence.events[
+                sourceIndex].features.end(),
+            window.inputs.begin() +
+                destinationIndex *
+                width);
+
+        window.paddingMask[
+            destinationIndex] =
+            1.0;
+    }
+
+    window.valid =
+        true;
+
+    if (!window.isValid(
+            contract))
+    {
+        return {};
+    }
+
+    return window;
 }
 
 std::vector<CompositionMidiSequenceWindow>
@@ -85,12 +178,6 @@ buildCompositionMidiSequenceWindows(
         return windows;
     }
 
-    const auto width =
-        contract.inputFeatureWidth;
-
-    const auto contextLength =
-        contract.contextLength;
-
     const auto targetCount =
         sequence.events.size() - 1;
 
@@ -101,69 +188,11 @@ buildCompositionMidiSequenceWindows(
          targetIndex <= targetCount;
          ++targetIndex)
     {
-        CompositionMidiSequenceWindow window;
-
-        window.contextLength =
-            contextLength;
-
-        window.featureWidth =
-            width;
-
-        window.inputs.assign(
-            contextLength * width,
-            0.0);
-
-        window.targets =
-            sequence.events[
-                targetIndex].features;
-
-        window.paddingMask.assign(
-            contextLength,
-            0.0);
-
-        const auto firstContextIndex =
-            targetIndex > contextLength
-                ? targetIndex - contextLength
-                : 0;
-
-        const auto available =
-            targetIndex -
-            firstContextIndex;
-
-        const auto padding =
-            contextLength -
-            available;
-
-        for (std::size_t contextIndex = 0;
-             contextIndex < available;
-             ++contextIndex)
-        {
-            const auto sourceIndex =
-                firstContextIndex +
-                contextIndex;
-
-            const auto destinationIndex =
-                padding +
-                contextIndex;
-
-            std::copy(
-                sequence.events[
-                    sourceIndex].features.begin(),
-                sequence.events[
-                    sourceIndex].features.end(),
-                window.inputs.begin() +
-                    destinationIndex *
-                    width);
-
-            window.paddingMask[
-                destinationIndex] =
-                1.0;
-        }
-
-        // Mark the candidate complete before running the public validity
-        // contract. `isValid()` intentionally requires `valid == true`.
-        window.valid =
-            true;
+        auto window =
+            buildCompositionMidiSequenceWindow(
+                sequence,
+                contract,
+                targetIndex);
 
         if (!window.isValid(
                 contract))

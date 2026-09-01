@@ -1,6 +1,7 @@
 #include "CompositionComposerKnowledgeCatalog.h"
 
 #include <algorithm>
+#include <unordered_map>
 
 namespace midigengx::music
 {
@@ -128,6 +129,9 @@ buildCompositionComposerKnowledgeCatalog(
     if (samples.empty())
         return result;
 
+    std::unordered_map<std::string, std::size_t> composerIndices;
+    composerIndices.reserve(samples.size());
+
     for (const auto& sample :
          samples)
     {
@@ -139,17 +143,12 @@ buildCompositionComposerKnowledgeCatalog(
             return result;
         }
 
-        auto iterator =
-            std::find_if(
-                result.composers.begin(),
-                result.composers.end(),
-                [&](const auto& group)
-                {
-                    return group.composerId ==
-                           sample.metadata.composerId;
-                });
+        const auto [iterator, inserted] =
+            composerIndices.emplace(
+                sample.metadata.composerId,
+                result.composers.size());
 
-        if (iterator == result.composers.end())
+        if (inserted)
         {
             CompositionComposerKnowledgeGroup group;
 
@@ -164,7 +163,8 @@ buildCompositionComposerKnowledgeCatalog(
         }
         else
         {
-            iterator->samples.push_back(
+            result.composers[
+                iterator->second].samples.push_back(
                 sample);
         }
     }

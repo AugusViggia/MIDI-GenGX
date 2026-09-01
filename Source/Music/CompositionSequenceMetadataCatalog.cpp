@@ -16,6 +16,7 @@ bool CompositionSequenceMetadataCatalog::isValid()
     }
 
     std::unordered_set<std::string> ids;
+    ids.reserve(entries.size());
 
     for (const auto& entry :
          entries)
@@ -36,17 +37,25 @@ CompositionSequenceMetadataCatalog::findBySampleId(
     const std::string& sampleId)
     const noexcept
 {
-    for (const auto& entry :
-         entries)
+    const auto iterator =
+        std::lower_bound(
+            entries.begin(),
+            entries.end(),
+            sampleId,
+            [](const auto& entry,
+               const std::string& value)
+            {
+                return entry.sampleId <
+                       value;
+            });
+
+    if (iterator == entries.end() ||
+        iterator->sampleId != sampleId)
     {
-        if (entry.sampleId ==
-            sampleId)
-        {
-            return &entry;
-        }
+        return nullptr;
     }
 
-    return nullptr;
+    return &*iterator;
 }
 
 CompositionSequenceMetadataCatalog

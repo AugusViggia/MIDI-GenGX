@@ -1,6 +1,7 @@
 #include "CompositionComposerKnowledgeTrainingCorpus.h"
 
 #include <algorithm>
+#include <vector>
 
 namespace midigengx::music
 {
@@ -74,27 +75,36 @@ buildCompositionComposerKnowledgeTrainingCorpus(
         return corpus;
     }
 
-    std::vector<CompositionComposerKnowledgeSample> flattened;
+    // Partition indices address the deterministic global catalog order. Keep
+    // references to the existing samples instead of copying the entire catalog
+    // into a temporary vector before selecting each split.
+    std::vector<const CompositionComposerKnowledgeSample*> flattened;
     flattened.reserve(catalog.sampleCount());
 
     for (const auto& composer : catalog.composers)
-        flattened.insert(
-            flattened.end(),
-            composer.samples.begin(),
-            composer.samples.end());
+    {
+        for (const auto& sample : composer.samples)
+            flattened.push_back(&sample);
+    }
 
     const auto append =
         [&flattened](
             std::vector<CompositionComposerKnowledgeSample>& target,
             const std::vector<std::size_t>& indices)
         {
+            target.reserve(indices.size());
+
             for (const auto index : indices)
             {
-                if (index >= flattened.size())
+                if (index >= flattened.size() ||
+                    flattened[index] == nullptr)
+                {
                     return false;
+                }
 
-                target.push_back(flattened[index]);
+                target.push_back(*flattened[index]);
             }
+
             return true;
         };
 

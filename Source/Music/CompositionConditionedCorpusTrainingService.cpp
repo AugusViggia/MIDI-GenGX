@@ -7,6 +7,7 @@
 #include "CompositionMidiTrainingCorpusArtifact.h"
 #include "CompositionConditionedSequenceNeuralModelArtifact.h"
 
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -68,10 +69,9 @@ runCompositionConditionedCorpusTraining(
         return result;
     }
 
-    // Production composer learning must have a complete metadata contract:
-    // every accepted MIDI sample needs a verified metadata entry, and every
-    // metadata entry must correspond to a discovered MIDI sample.
     std::unordered_set<std::string> midiSampleIds;
+    midiSampleIds.reserve(
+        loaded.records.size());
 
     for (const auto& record :
          loaded.records)
@@ -84,6 +84,8 @@ runCompositionConditionedCorpusTraining(
     }
 
     std::unordered_set<std::string> metadataSampleIds;
+    metadataSampleIds.reserve(
+        metadataCatalog.entries.size());
 
     for (const auto& metadata :
          metadataCatalog.entries)
@@ -101,7 +103,7 @@ runCompositionConditionedCorpusTraining(
     }
 
     if (metadataSampleIds.size() !=
-            midiSampleIds.size())
+        midiSampleIds.size())
     {
         return result;
     }
@@ -127,7 +129,7 @@ runCompositionConditionedCorpusTraining(
 
     std::vector<CompositionMidiTrainingSequence>
         sequences =
-            prepared.sequences;
+        prepared.sequences;
 
     result.inputFileCount =
         loaded.discoveredFileCount;
@@ -160,9 +162,24 @@ runCompositionConditionedCorpusTraining(
     if (!result.metadataArtifact.isValid())
         return result;
 
-    // Build the established composer-aware catalog from the prepared real
-    // sequences. This is the first point where the train/validation/test
-    // boundary becomes authoritative for the neural training run.
+    std::unordered_map<
+        std::string,
+        const CompositionMidiTrainingSequence*> sequenceBySampleId;
+
+    sequenceBySampleId.reserve(
+        sequences.size());
+
+    for (const auto& sequence :
+         sequences)
+    {
+        if (!sequenceBySampleId.emplace(
+                sequence.sampleId,
+                &sequence).second)
+        {
+            return result;
+        }
+    }
+
     std::vector<CompositionComposerKnowledgeSample>
         knowledgeSamples;
 
@@ -183,11 +200,11 @@ runCompositionConditionedCorpusTraining(
         composition.sampleId =
             sequence.sampleId;
         composition.globalFeatures =
-            {
-                0.0,
-                0.0,
-                0.0
-            };
+        {
+            0.0,
+            0.0,
+            0.0
+        };
         composition.analysisValid =
             true;
 
@@ -262,23 +279,18 @@ runCompositionConditionedCorpusTraining(
     for (const auto& sample :
          trainingCorpus.trainingSamples)
     {
-        trainingSequences.push_back(
-            sample.composition.sampleId.empty()
-                ? CompositionMidiTrainingSequence{}
-                : [&]()
-                {
-                    for (const auto& candidate :
-                         sequences)
-                    {
-                        if (candidate.sampleId ==
-                            sample.composition.sampleId)
-                        {
-                            return candidate;
-                        }
-                    }
+        const auto it =
+            sequenceBySampleId.find(
+                sample.composition.sampleId);
 
-                    return CompositionMidiTrainingSequence{};
-                }());
+        if (it == sequenceBySampleId.end() ||
+            it->second == nullptr)
+        {
+            return result;
+        }
+
+        trainingSequences.push_back(
+            *it->second);
     }
 
     for (const auto& trainingSequence :
@@ -297,9 +309,9 @@ runCompositionConditionedCorpusTraining(
         return result;
 
     result.trainingRun =
-        runCompositionConditionedTraining(
-            serializeCompositionMidiTrainingSequences(
-                trainingSequences),
+        runCompositionConditionedTrainingFromDataset(
+            trainingDataset,
+            result.sequenceCorpusArtifact,
             result.metadataArtifact,
             config);
 
@@ -316,7 +328,7 @@ runCompositionConditionedCorpusTraining(
     }
 
     const auto buildSplitSequences =
-        [&sequences](
+        [&sequenceBySampleId](
             const std::vector<
                 CompositionComposerKnowledgeSample>& splitSamples)
         {
@@ -329,17 +341,19 @@ runCompositionConditionedCorpusTraining(
             for (const auto& sample :
                  splitSamples)
             {
-                for (const auto& candidate :
-                     sequences)
+                const auto it =
+                    sequenceBySampleId.find(
+                        sample.composition.sampleId);
+
+                if (it == sequenceBySampleId.end() ||
+                    it->second == nullptr)
                 {
-                    if (candidate.sampleId ==
-                        sample.composition.sampleId)
-                    {
-                        splitSequences.push_back(
-                            candidate);
-                        break;
-                    }
+                    return std::vector<
+                        CompositionMidiTrainingSequence>{};
                 }
+
+                splitSequences.push_back(
+                    *it->second);
             }
 
             return splitSequences;

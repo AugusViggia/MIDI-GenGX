@@ -86,6 +86,47 @@ void addEmbedding(
     }
 }
 
+bool hasValidInferenceStructure(
+    const CompositionConditionedSequenceNeuralModel& model,
+    const CompositionMidiSequenceWindow& window,
+    const CompositionConditionedTrainingSample& sample) noexcept
+{
+    return model.initialized &&
+           model.contract.isValid() &&
+           model.vocabulary.isValid() &&
+           window.isValid(model.contract) &&
+           sample.isValid() &&
+           sample.composerIndex <
+               model.vocabulary.composers.size() &&
+           sample.styleIndex <
+               model.vocabulary.styles.size() &&
+           sample.eraIndex <
+               model.vocabulary.eras.size() &&
+           sample.instrumentationIndex <
+               model.vocabulary.instrumentations.size() &&
+           model.inputWeights.size() ==
+               CompositionConditionedSequenceNeuralModel::hiddenWidth *
+               model.contract.inputFeatureWidth &&
+           model.recurrentWeights.size() ==
+               CompositionConditionedSequenceNeuralModel::hiddenWidth *
+               CompositionConditionedSequenceNeuralModel::hiddenWidth &&
+           model.hiddenBias.size() ==
+               CompositionConditionedSequenceNeuralModel::hiddenWidth &&
+           model.outputWeights.size() ==
+               model.contract.targetFeatureWidth *
+               CompositionConditionedSequenceNeuralModel::hiddenWidth &&
+           model.outputBias.size() ==
+               model.contract.targetFeatureWidth &&
+           model.composerEmbeddings.size() ==
+               embeddingSize(model.vocabulary.composers.size()) &&
+           model.styleEmbeddings.size() ==
+               embeddingSize(model.vocabulary.styles.size()) &&
+           model.eraEmbeddings.size() ==
+               embeddingSize(model.vocabulary.eras.size()) &&
+           model.instrumentationEmbeddings.size() ==
+               embeddingSize(model.vocabulary.instrumentations.size());
+}
+
 } // namespace
 
 bool CompositionConditionedSequenceNeuralPrediction::isValid(
@@ -324,17 +365,10 @@ CompositionConditionedSequenceNeuralModel::predictNextEvent(
 {
     CompositionConditionedSequenceNeuralPrediction prediction;
 
-    if (!isValid() ||
-        !window.isValid(contract) ||
-        !sample.isValid() ||
-        sample.composerIndex >=
-            vocabulary.composers.size() ||
-        sample.styleIndex >=
-            vocabulary.styles.size() ||
-        sample.eraIndex >=
-            vocabulary.eras.size() ||
-        sample.instrumentationIndex >=
-            vocabulary.instrumentations.size())
+    if (!hasValidInferenceStructure(
+            *this,
+            window,
+            sample))
     {
         return prediction;
     }
@@ -342,8 +376,15 @@ CompositionConditionedSequenceNeuralModel::predictNextEvent(
     const auto width =
         contract.inputFeatureWidth;
 
-    std::vector<double> hidden(
-        hiddenWidth,
+    thread_local std::vector<double> hidden;
+    thread_local std::vector<double> nextHidden;
+
+    hidden.resize(hiddenWidth);
+    nextHidden.resize(hiddenWidth);
+
+    std::fill(
+        hidden.begin(),
+        hidden.end(),
         0.0);
 
     addEmbedding(
@@ -373,8 +414,9 @@ CompositionConditionedSequenceNeuralModel::predictNextEvent(
         if (window.paddingMask[time] <= 0.0)
             continue;
 
-        std::vector<double> nextHidden(
-            hiddenWidth,
+        std::fill(
+            nextHidden.begin(),
+            nextHidden.end(),
             0.0);
 
         const auto inputBase =
@@ -420,13 +462,12 @@ CompositionConditionedSequenceNeuralModel::predictNextEvent(
                 std::tanh(sum);
         }
 
-        hidden =
-            std::move(nextHidden);
+        hidden.swap(
+            nextHidden);
     }
 
-    prediction.features.assign(
-        contract.targetFeatureWidth,
-        0.0);
+    prediction.features.resize(
+        contract.targetFeatureWidth);
 
     for (std::size_t row = 0;
          row < contract.targetFeatureWidth;

@@ -1,4 +1,5 @@
 #include "CompositionConditionedTrainingRunService.h"
+
 #include "CompositionMidiTrainingCorpusArtifact.h"
 
 namespace midigengx::music
@@ -14,6 +15,59 @@ bool CompositionConditionedTrainingRunResult::isValid()
            datasetArtifact.isValid() &&
            training.isValid() &&
            modelArtifact.isValid();
+}
+
+CompositionConditionedTrainingRunResult
+runCompositionConditionedTrainingFromDataset(
+    const CompositionConditionedTrainingDataset& dataset,
+    const CompositionMidiTrainingCorpusArtifact& sequenceCorpusArtifact,
+    const CompositionSequenceMetadataArtifact& metadataArtifact,
+    const CompositionConditionedSequenceNeuralTrainingConfig& config)
+    noexcept
+{
+    CompositionConditionedTrainingRunResult result;
+
+    if (!dataset.isValid() ||
+        !sequenceCorpusArtifact.isValid() ||
+        !metadataArtifact.isValid())
+    {
+        return result;
+    }
+
+    result.sequenceCount =
+        dataset.sampleCount();
+
+    result.conditionedSampleCount =
+        dataset.sampleCount();
+
+    result.datasetArtifact =
+        serializeCompositionConditionedTrainingDataset(
+            dataset);
+
+    if (!result.datasetArtifact.isValid())
+        return result;
+
+    const auto training =
+        trainCompositionConditionedSequenceNeuralModelFromDataset(
+            dataset,
+            config);
+
+    if (!training.isValid())
+        return result;
+
+    result.training =
+        training.training;
+
+    result.modelArtifact =
+        training.artifact;
+
+    result.valid =
+        true;
+
+    if (!result.isValid())
+        result.valid = false;
+
+    return result;
 }
 
 CompositionConditionedTrainingRunResult
@@ -53,7 +107,7 @@ runCompositionConditionedTraining(
         return result;
     }
 
-    auto dataset =
+    const auto dataset =
         buildCompositionConditionedTrainingDataset(
             sequences,
             metadataCatalog);
@@ -61,40 +115,11 @@ runCompositionConditionedTraining(
     if (!dataset.isValid())
         return result;
 
-    result.sequenceCount =
-        sequences.size();
-
-    result.conditionedSampleCount =
-        dataset.sampleCount();
-
-    result.datasetArtifact =
-        serializeCompositionConditionedTrainingDataset(
-            dataset);
-
-    if (!result.datasetArtifact.isValid())
-        return result;
-
-    const auto training =
-        trainCompositionConditionedSequenceNeuralModelFromDataset(
-            dataset,
-            config);
-
-    if (!training.isValid())
-        return result;
-
-    result.training =
-        training.training;
-
-    result.modelArtifact =
-        training.artifact;
-
-    result.valid =
-        true;
-
-    if (!result.isValid())
-        result.valid = false;
-
-    return result;
+    return runCompositionConditionedTrainingFromDataset(
+        dataset,
+        sequenceCorpusArtifact,
+        metadataArtifact,
+        config);
 }
 
 } // namespace midigengx::music

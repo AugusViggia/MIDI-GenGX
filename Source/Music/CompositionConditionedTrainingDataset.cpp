@@ -1,6 +1,7 @@
 #include "CompositionConditionedTrainingDataset.h"
 
 #include <algorithm>
+#include <unordered_map>
 #include <unordered_set>
 
 namespace midigengx::music
@@ -17,6 +18,7 @@ bool CompositionConditionedTrainingDataset::isValid()
     }
 
     std::unordered_set<std::string> ids;
+    ids.reserve(samples.size());
 
     for (const auto& sample :
          samples)
@@ -66,15 +68,27 @@ buildCompositionConditionedTrainingDataset(
     }
 
     std::vector<CompositionSequenceMetadata> verifiedMetadata;
+    verifiedMetadata.reserve(
+        metadataCatalog.entries.size());
+
+    std::unordered_map<
+        std::string,
+        const CompositionSequenceMetadata*> metadataBySampleId;
+    metadataBySampleId.reserve(
+        metadataCatalog.entries.size());
 
     for (const auto& entry :
          metadataCatalog.entries)
     {
-        if (entry.verified)
-        {
-            verifiedMetadata.push_back(
-                entry);
-        }
+        if (!entry.verified)
+            continue;
+
+        verifiedMetadata.push_back(
+            entry);
+
+        metadataBySampleId.emplace(
+            entry.sampleId,
+            &entry);
     }
 
     if (verifiedMetadata.empty())
@@ -96,16 +110,19 @@ buildCompositionConditionedTrainingDataset(
         if (!sequence.isValid())
             return CompositionConditionedTrainingDataset{};
 
-        const auto* metadata =
-            metadataCatalog.findBySampleId(
+        const auto metadataIterator =
+            metadataBySampleId.find(
                 sequence.sampleId);
 
-        if (metadata == nullptr ||
-            !metadata->isValid() ||
-            !metadata->verified)
+        if (metadataIterator ==
+                metadataBySampleId.end() ||
+            metadataIterator->second == nullptr)
         {
             return CompositionConditionedTrainingDataset{};
         }
+
+        const auto* metadata =
+            metadataIterator->second;
 
         CompositionConditionedTrainingSample sample;
 

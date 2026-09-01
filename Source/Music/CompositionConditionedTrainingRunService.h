@@ -26,6 +26,15 @@ CompositionConditionedTrainingRunResult
 runCompositionConditionedTraining(
     const CompositionMidiTrainingCorpusArtifact& sequenceCorpusArtifact,
     const CompositionSequenceMetadataArtifact& metadataArtifact,
-    const CompositionConditionedSequenceNeuralTrainingConfig& config) noexcept;
+    const CompositionConditionedSequenceNeuralTrainingConfig& config)
+    noexcept;
+
+CompositionConditionedTrainingRunResult
+runCompositionConditionedTrainingFromDataset(
+    const CompositionConditionedTrainingDataset& dataset,
+    const CompositionMidiTrainingCorpusArtifact& sequenceCorpusArtifact,
+    const CompositionSequenceMetadataArtifact& metadataArtifact,
+    const CompositionConditionedSequenceNeuralTrainingConfig& config)
+    noexcept;
 
 } // namespace midigengx::music

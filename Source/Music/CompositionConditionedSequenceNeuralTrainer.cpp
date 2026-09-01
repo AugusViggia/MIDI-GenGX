@@ -1,4 +1,3 @@
-
 #include "CompositionConditionedSequenceNeuralTrainer.h"
 
 #include <algorithm>
@@ -56,43 +55,87 @@ Gradients makeGradients(
 {
     Gradients g;
 
-    g.inputWeights.assign(
-        model.inputWeights.size(),
-        0.0);
-
-    g.recurrentWeights.assign(
-        model.recurrentWeights.size(),
-        0.0);
-
-    g.hiddenBias.assign(
-        model.hiddenBias.size(),
-        0.0);
-
-    g.outputWeights.assign(
-        model.outputWeights.size(),
-        0.0);
-
-    g.outputBias.assign(
-        model.outputBias.size(),
-        0.0);
-
-    g.composerEmbeddings.assign(
-        model.composerEmbeddings.size(),
-        0.0);
-
-    g.styleEmbeddings.assign(
-        model.styleEmbeddings.size(),
-        0.0);
-
-    g.eraEmbeddings.assign(
-        model.eraEmbeddings.size(),
-        0.0);
-
-    g.instrumentationEmbeddings.assign(
-        model.instrumentationEmbeddings.size(),
-        0.0);
+    g.inputWeights.assign(model.inputWeights.size(), 0.0);
+    g.recurrentWeights.assign(model.recurrentWeights.size(), 0.0);
+    g.hiddenBias.assign(model.hiddenBias.size(), 0.0);
+    g.outputWeights.assign(model.outputWeights.size(), 0.0);
+    g.outputBias.assign(model.outputBias.size(), 0.0);
+    g.composerEmbeddings.assign(model.composerEmbeddings.size(), 0.0);
+    g.styleEmbeddings.assign(model.styleEmbeddings.size(), 0.0);
+    g.eraEmbeddings.assign(model.eraEmbeddings.size(), 0.0);
+    g.instrumentationEmbeddings.assign(model.instrumentationEmbeddings.size(), 0.0);
 
     return g;
+}
+
+void clearGradients(Gradients& g) noexcept
+{
+    for (auto* values :
+         {
+             &g.inputWeights,
+             &g.recurrentWeights,
+             &g.hiddenBias,
+             &g.outputWeights,
+             &g.outputBias,
+             &g.composerEmbeddings,
+             &g.styleEmbeddings,
+             &g.eraEmbeddings,
+             &g.instrumentationEmbeddings
+         })
+    {
+        std::fill(values->begin(), values->end(), 0.0);
+    }
+}
+
+void accumulateGradientVectors(
+    std::vector<double>& destination,
+    const std::vector<double>& source) noexcept
+{
+    for (std::size_t index = 0;
+         index < destination.size();
+         ++index)
+    {
+        destination[index] += source[index];
+    }
+}
+
+void accumulateGradients(
+    Gradients& destination,
+    const Gradients& source) noexcept
+{
+    accumulateGradientVectors(destination.inputWeights, source.inputWeights);
+    accumulateGradientVectors(destination.recurrentWeights, source.recurrentWeights);
+    accumulateGradientVectors(destination.hiddenBias, source.hiddenBias);
+    accumulateGradientVectors(destination.outputWeights, source.outputWeights);
+    accumulateGradientVectors(destination.outputBias, source.outputBias);
+    accumulateGradientVectors(destination.composerEmbeddings, source.composerEmbeddings);
+    accumulateGradientVectors(destination.styleEmbeddings, source.styleEmbeddings);
+    accumulateGradientVectors(destination.eraEmbeddings, source.eraEmbeddings);
+    accumulateGradientVectors(
+        destination.instrumentationEmbeddings,
+        source.instrumentationEmbeddings);
+}
+
+void scaleGradients(
+    Gradients& gradients,
+    double scale) noexcept
+{
+    for (auto* values :
+         {
+             &gradients.inputWeights,
+             &gradients.recurrentWeights,
+             &gradients.hiddenBias,
+             &gradients.outputWeights,
+             &gradients.outputBias,
+             &gradients.composerEmbeddings,
+             &gradients.styleEmbeddings,
+             &gradients.eraEmbeddings,
+             &gradients.instrumentationEmbeddings
+         })
+    {
+        for (auto& value : *values)
+            value *= scale;
+    }
 }
 
 void addEmbeddingGradient(
@@ -104,18 +147,14 @@ void addEmbeddingGradient(
         CompositionConditionedSequenceNeuralModel::conditionEmbeddingWidth;
 
     const auto base =
-        static_cast<std::size_t>(
-            categoryIndex) *
-        width;
+        static_cast<std::size_t>(categoryIndex) * width;
 
     for (std::size_t index = 0;
          index < width &&
          base + index < gradient.size();
          ++index)
     {
-        gradient[
-            base + index] +=
-            hiddenGradient[index];
+        gradient[base + index] += hiddenGradient[index];
     }
 }
 
@@ -154,10 +193,7 @@ double trainWindow(
             std::size_t timeCount,
             std::size_t hiddenWidth)
         {
-            hidden.resize(
-                (timeCount + 1) *
-                hiddenWidth);
-
+            hidden.resize((timeCount + 1) * hiddenWidth);
             dhNext.resize(hiddenWidth);
             dh.resize(hiddenWidth);
             nextDh.resize(hiddenWidth);
@@ -170,15 +206,8 @@ double trainWindow(
         timeCount,
         CompositionConditionedSequenceNeuralModel::hiddenWidth);
 
-    std::fill(
-        workspace.hidden.begin(),
-        workspace.hidden.end(),
-        0.0);
-
-    std::fill(
-        workspace.dhNext.begin(),
-        workspace.dhNext.end(),
-        0.0);
+    std::fill(workspace.hidden.begin(), workspace.hidden.end(), 0.0);
+    std::fill(workspace.dhNext.begin(), workspace.dhNext.end(), 0.0);
 
     const auto embeddingWidth =
         CompositionConditionedSequenceNeuralModel::conditionEmbeddingWidth;
@@ -191,45 +220,30 @@ double trainWindow(
                     std::uint32_t index)
                 {
                     const auto base =
-                        static_cast<std::size_t>(
-                            index) *
+                        static_cast<std::size_t>(index) *
                         embeddingWidth;
 
                     for (std::size_t dimension = 0;
                          dimension < embeddingWidth &&
                          dimension <
-                             CompositionConditionedSequenceNeuralModel::hiddenWidth;
+                         CompositionConditionedSequenceNeuralModel::hiddenWidth;
                          ++dimension)
                     {
-                        if (base + dimension <
-                            embedding.size())
+                        if (base + dimension < embedding.size())
                         {
                             target[dimension] +=
-                                embedding[
-                                    base + dimension];
+                                embedding[base + dimension];
                         }
                     }
                 };
 
-            add(
-                model.composerEmbeddings,
-                sample.composerIndex);
-
-            add(
-                model.styleEmbeddings,
-                sample.styleIndex);
-
-            add(
-                model.eraEmbeddings,
-                sample.eraIndex);
-
-            add(
-                model.instrumentationEmbeddings,
-                sample.instrumentationIndex);
+            add(model.composerEmbeddings, sample.composerIndex);
+            add(model.styleEmbeddings, sample.styleIndex);
+            add(model.eraEmbeddings, sample.eraIndex);
+            add(model.instrumentationEmbeddings, sample.instrumentationIndex);
         };
 
-    addInitialCondition(
-        workspace.hidden);
+    addInitialCondition(workspace.hidden);
 
     for (std::size_t time = 0;
          time < timeCount;
@@ -248,7 +262,7 @@ double trainWindow(
 
         for (std::size_t row = 0;
              row <
-                 CompositionConditionedSequenceNeuralModel::hiddenWidth;
+             CompositionConditionedSequenceNeuralModel::hiddenWidth;
              ++row)
         {
             double sum =
@@ -263,11 +277,9 @@ double trainWindow(
             {
                 sum +=
                     model.inputWeights[
-                        inputWeightBase +
-                        column] *
+                        inputWeightBase + column] *
                     window.inputs[
-                        inputBase +
-                        column];
+                        inputBase + column];
             }
 
             const auto recurrentBase =
@@ -276,21 +288,18 @@ double trainWindow(
 
             for (std::size_t column = 0;
                  column <
-                     CompositionConditionedSequenceNeuralModel::hiddenWidth;
+                 CompositionConditionedSequenceNeuralModel::hiddenWidth;
                  ++column)
             {
                 sum +=
                     model.recurrentWeights[
-                        recurrentBase +
-                        column] *
+                        recurrentBase + column] *
                     workspace.hidden[
-                        hiddenBase +
-                        column];
+                        hiddenBase + column];
             }
 
             workspace.hidden[
-                nextHiddenBase +
-                row] =
+                nextHiddenBase + row] =
                 std::tanh(sum);
         }
     }
@@ -303,8 +312,7 @@ double trainWindow(
 
     const auto outputScale =
         2.0 /
-        static_cast<double>(
-            targetWidth);
+        static_cast<double>(targetWidth);
 
     for (std::size_t row = 0;
          row < targetWidth;
@@ -319,29 +327,25 @@ double trainWindow(
 
         for (std::size_t column = 0;
              column <
-                 CompositionConditionedSequenceNeuralModel::hiddenWidth;
+             CompositionConditionedSequenceNeuralModel::hiddenWidth;
              ++column)
         {
             sum +=
                 model.outputWeights[
-                    base +
-                    column] *
+                    base + column] *
                 workspace.hidden[
-                    finalHiddenBase +
-                    column];
+                    finalHiddenBase + column];
         }
 
         const auto output =
-            std::clamp(
-                sum,
-                -1.0,
-                1.0);
+            std::clamp(sum, -1.0, 1.0);
 
         const auto error =
             output -
             window.targets[row];
 
-        const auto weight = featureLossWeight(row, config);
+        const auto weight =
+            featureLossWeight(row, config);
 
         loss +=
             weight * error * error;
@@ -351,22 +355,19 @@ double trainWindow(
 
         for (std::size_t column = 0;
              column <
-                 CompositionConditionedSequenceNeuralModel::hiddenWidth;
+             CompositionConditionedSequenceNeuralModel::hiddenWidth;
              ++column)
         {
             gradients.outputWeights[
-                base +
-                column] +=
+                base + column] +=
                 gradient *
                 workspace.hidden[
-                    finalHiddenBase +
-                    column];
+                    finalHiddenBase + column];
 
             workspace.dhNext[column] +=
                 gradient *
                 model.outputWeights[
-                    base +
-                    column];
+                    base + column];
         }
 
         gradients.outputBias[row] +=
@@ -393,30 +394,27 @@ double trainWindow(
 
         for (std::size_t row = 0;
              row <
-                 CompositionConditionedSequenceNeuralModel::hiddenWidth;
+             CompositionConditionedSequenceNeuralModel::hiddenWidth;
              ++row)
         {
             workspace.dh[row] =
                 workspace.dhNext[row] *
                 (1.0 -
                  workspace.hidden[
-                     nextHiddenBase +
-                     row] *
+                     nextHiddenBase + row] *
                  workspace.hidden[
-                     nextHiddenBase +
-                     row]);
+                     nextHiddenBase + row]);
         }
 
         for (std::size_t row = 0;
              row <
-                 CompositionConditionedSequenceNeuralModel::hiddenWidth;
+             CompositionConditionedSequenceNeuralModel::hiddenWidth;
              ++row)
         {
             const auto gradient =
                 workspace.dh[row];
 
-            gradients.hiddenBias[row] +=
-                gradient;
+            gradients.hiddenBias[row] += gradient;
 
             const auto inputWeightBase =
                 row * width;
@@ -426,12 +424,10 @@ double trainWindow(
                  ++column)
             {
                 gradients.inputWeights[
-                    inputWeightBase +
-                    column] +=
+                    inputWeightBase + column] +=
                     gradient *
                     window.inputs[
-                        inputBase +
-                        column];
+                        inputBase + column];
             }
 
             const auto recurrentBase =
@@ -440,16 +436,14 @@ double trainWindow(
 
             for (std::size_t column = 0;
                  column <
-                     CompositionConditionedSequenceNeuralModel::hiddenWidth;
+                 CompositionConditionedSequenceNeuralModel::hiddenWidth;
                  ++column)
             {
                 gradients.recurrentWeights[
-                    recurrentBase +
-                    column] +=
+                    recurrentBase + column] +=
                     gradient *
                     workspace.hidden[
-                        hiddenBase +
-                        column];
+                        hiddenBase + column];
             }
         }
 
@@ -483,7 +477,7 @@ double trainWindow(
 
         for (std::size_t row = 0;
              row <
-                 CompositionConditionedSequenceNeuralModel::hiddenWidth;
+             CompositionConditionedSequenceNeuralModel::hiddenWidth;
              ++row)
         {
             const auto base =
@@ -492,14 +486,13 @@ double trainWindow(
 
             for (std::size_t column = 0;
                  column <
-                     CompositionConditionedSequenceNeuralModel::hiddenWidth;
+                 CompositionConditionedSequenceNeuralModel::hiddenWidth;
                  ++column)
             {
                 workspace.nextDh[column] +=
                     workspace.dh[row] *
                     model.recurrentWeights[
-                        base +
-                        column];
+                        base + column];
             }
         }
 
@@ -508,10 +501,17 @@ double trainWindow(
     }
 
     double totalWeight = 0.0;
-    for (std::size_t row = 0; row < targetWidth; ++row)
-        totalWeight += featureLossWeight(row, config);
 
-    return loss / std::max(totalWeight, 1.0);
+    for (std::size_t row = 0;
+         row < targetWidth;
+         ++row)
+    {
+        totalWeight +=
+            featureLossWeight(row, config);
+    }
+
+    return loss /
+           std::max(totalWeight, 1.0);
 }
 
 template <typename Vector>
@@ -565,46 +565,14 @@ void applyGradients(
     const Gradients& g,
     double learningRate)
 {
-    applyVector(
-        model.inputWeights,
-        g.inputWeights,
-        learningRate);
-
-    applyVector(
-        model.recurrentWeights,
-        g.recurrentWeights,
-        learningRate);
-
-    applyVector(
-        model.hiddenBias,
-        g.hiddenBias,
-        learningRate);
-
-    applyVector(
-        model.outputWeights,
-        g.outputWeights,
-        learningRate);
-
-    applyVector(
-        model.outputBias,
-        g.outputBias,
-        learningRate);
-
-    applyVector(
-        model.composerEmbeddings,
-        g.composerEmbeddings,
-        learningRate);
-
-    applyVector(
-        model.styleEmbeddings,
-        g.styleEmbeddings,
-        learningRate);
-
-    applyVector(
-        model.eraEmbeddings,
-        g.eraEmbeddings,
-        learningRate);
-
+    applyVector(model.inputWeights, g.inputWeights, learningRate);
+    applyVector(model.recurrentWeights, g.recurrentWeights, learningRate);
+    applyVector(model.hiddenBias, g.hiddenBias, learningRate);
+    applyVector(model.outputWeights, g.outputWeights, learningRate);
+    applyVector(model.outputBias, g.outputBias, learningRate);
+    applyVector(model.composerEmbeddings, g.composerEmbeddings, learningRate);
+    applyVector(model.styleEmbeddings, g.styleEmbeddings, learningRate);
+    applyVector(model.eraEmbeddings, g.eraEmbeddings, learningRate);
     applyVector(
         model.instrumentationEmbeddings,
         g.instrumentationEmbeddings,
@@ -667,29 +635,48 @@ trainCompositionConditionedSequenceNeuralModel(
         return result;
     }
 
-    struct WindowSamplePair
+    struct ExampleDescriptor
     {
-        CompositionMidiSequenceWindow window;
+        const CompositionMidiTrainingSequence* sequence = nullptr;
         const CompositionConditionedTrainingSample* sample = nullptr;
+        std::size_t targetIndex = 0;
     };
 
-    std::vector<WindowSamplePair> examples;
+    std::vector<ExampleDescriptor> examples;
+
+    std::size_t totalExampleCount = 0;
 
     for (const auto& sample :
          dataset.samples)
     {
-        const auto windows =
-            buildCompositionMidiSequenceWindows(
-                sample.sequence,
-                model.contract);
+        if (sample.sequence.events.size() < 2)
+            continue;
 
-        for (const auto& window :
-             windows)
+        totalExampleCount +=
+            sample.sequence.events.size() - 1;
+    }
+
+    examples.reserve(
+        totalExampleCount);
+
+    for (const auto& sample :
+         dataset.samples)
+    {
+        if (sample.sequence.events.size() < 2)
+            continue;
+
+        const auto targetCount =
+            sample.sequence.events.size() - 1;
+
+        for (std::size_t targetIndex = 1;
+             targetIndex <= targetCount;
+             ++targetIndex)
         {
             examples.push_back(
             {
-                window,
-                &sample
+                &sample.sequence,
+                &sample,
+                targetIndex
             });
         }
     }
@@ -700,6 +687,21 @@ trainCompositionConditionedSequenceNeuralModel(
     result.windowCount =
         examples.size();
 
+    double totalLossWeight = 0.0;
+    for (std::size_t index = 0;
+         index < model.contract.targetFeatureWidth;
+         ++index)
+    {
+        totalLossWeight +=
+            featureLossWeight(index, config);
+    }
+
+    const auto normalizedDenominator =
+        std::max(
+            static_cast<double>(examples.size()) *
+                totalLossWeight,
+            1.0);
+
     auto evaluateLoss =
         [&]()
         {
@@ -708,9 +710,20 @@ trainCompositionConditionedSequenceNeuralModel(
             for (const auto& example :
                  examples)
             {
+                const auto window =
+                    buildCompositionMidiSequenceWindow(
+                        *example.sequence,
+                        model.contract,
+                        example.targetIndex);
+
+                if (!window.isValid(model.contract))
+                {
+                    return std::numeric_limits<double>::infinity();
+                }
+
                 const auto prediction =
                     model.predictNextEvent(
-                        example.window,
+                        window,
                         *example.sample);
 
                 if (!prediction.isValid(
@@ -720,29 +733,22 @@ trainCompositionConditionedSequenceNeuralModel(
                 }
 
                 for (std::size_t index = 0;
-                     index <
-                     prediction.features.size();
+                     index < prediction.features.size();
                      ++index)
                 {
                     const auto error =
                         prediction.features[index] -
-                        example.window.targets[index];
+                        window.targets[index];
 
                     total +=
-                        error * error;
+                        featureLossWeight(index, config) *
+                        error *
+                        error;
                 }
             }
 
-            double totalWeight = 0.0;
-            for (std::size_t index = 0;
-                 index < model.contract.targetFeatureWidth;
-                 ++index)
-                totalWeight += featureLossWeight(index, config);
-
             return total /
-                   std::max(
-                       static_cast<double>(examples.size()) * totalWeight,
-                       1.0);
+                   normalizedDenominator;
         };
 
     result.initialLoss =
@@ -783,26 +789,10 @@ trainCompositionConditionedSequenceNeuralModel(
          epoch < config.epochs;
          ++epoch)
     {
-        for (auto& worker : workerGradients)
+        for (auto& worker :
+             workerGradients)
         {
-            for (auto* values :
-                 {
-                     &worker.inputWeights,
-                     &worker.recurrentWeights,
-                     &worker.hiddenBias,
-                     &worker.outputWeights,
-                     &worker.outputBias,
-                     &worker.composerEmbeddings,
-                     &worker.styleEmbeddings,
-                     &worker.eraEmbeddings,
-                     &worker.instrumentationEmbeddings
-                 })
-            {
-                std::fill(
-                    values->begin(),
-                    values->end(),
-                    0.0);
-            }
+            clearGradients(worker);
         }
 
         std::vector<std::thread> workers;
@@ -829,10 +819,22 @@ trainCompositionConditionedSequenceNeuralModel(
                          exampleIndex < end;
                          ++exampleIndex)
                     {
+                        const auto& example =
+                            examples[exampleIndex];
+
+                        const auto window =
+                            buildCompositionMidiSequenceWindow(
+                                *example.sequence,
+                                model.contract,
+                                example.targetIndex);
+
+                        if (!window.isValid(model.contract))
+                            continue;
+
                         trainWindow(
                             model,
-                            examples[exampleIndex].window,
-                            *examples[exampleIndex].sample,
+                            window,
+                            *example.sample,
                             workerGradients[workerIndex],
                             config);
                     }
@@ -845,68 +847,14 @@ trainCompositionConditionedSequenceNeuralModel(
             worker.join();
         }
 
-        for (auto* values :
-             {
-                 &gradients.inputWeights,
-                 &gradients.recurrentWeights,
-                 &gradients.hiddenBias,
-                 &gradients.outputWeights,
-                 &gradients.outputBias,
-                 &gradients.composerEmbeddings,
-                 &gradients.styleEmbeddings,
-                 &gradients.eraEmbeddings,
-                 &gradients.instrumentationEmbeddings
-             })
-        {
-            std::fill(
-                values->begin(),
-                values->end(),
-                0.0);
-        }
+        clearGradients(gradients);
 
         for (const auto& worker :
              workerGradients)
         {
-            auto accumulate =
-                [](std::vector<double>& destination,
-                   const std::vector<double>& source)
-                {
-                    for (std::size_t index = 0;
-                         index < destination.size();
-                         ++index)
-                    {
-                        destination[index] +=
-                            source[index];
-                    }
-                };
-
-            accumulate(
-                gradients.inputWeights,
-                worker.inputWeights);
-            accumulate(
-                gradients.recurrentWeights,
-                worker.recurrentWeights);
-            accumulate(
-                gradients.hiddenBias,
-                worker.hiddenBias);
-            accumulate(
-                gradients.outputWeights,
-                worker.outputWeights);
-            accumulate(
-                gradients.outputBias,
-                worker.outputBias);
-            accumulate(
-                gradients.composerEmbeddings,
-                worker.composerEmbeddings);
-            accumulate(
-                gradients.styleEmbeddings,
-                worker.styleEmbeddings);
-            accumulate(
-                gradients.eraEmbeddings,
-                worker.eraEmbeddings);
-            accumulate(
-                gradients.instrumentationEmbeddings,
-                worker.instrumentationEmbeddings);
+            accumulateGradients(
+                gradients,
+                worker);
         }
 
         const auto scale =
@@ -914,25 +862,9 @@ trainCompositionConditionedSequenceNeuralModel(
             static_cast<double>(
                 examples.size());
 
-        for (auto* values :
-             {
-                 &gradients.inputWeights,
-                 &gradients.recurrentWeights,
-                 &gradients.hiddenBias,
-                 &gradients.outputWeights,
-                 &gradients.outputBias,
-                 &gradients.composerEmbeddings,
-                 &gradients.styleEmbeddings,
-                 &gradients.eraEmbeddings,
-                 &gradients.instrumentationEmbeddings
-             })
-        {
-            for (auto& value :
-                 *values)
-            {
-                value *= scale;
-            }
-        }
+        scaleGradients(
+            gradients,
+            scale);
 
         clipGradients(
             gradients,
@@ -986,4 +918,3 @@ trainCompositionConditionedSequenceNeuralModel(
 }
 
 } // namespace midigengx::music
-
