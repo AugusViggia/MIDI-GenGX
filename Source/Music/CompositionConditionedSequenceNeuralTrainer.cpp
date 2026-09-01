@@ -691,13 +691,22 @@ trainCompositionConditionedSequenceNeuralModel(
     result.windowCount =
         examples.size();
 
+    const auto targetFeatureWidth =
+        model.contract.targetFeatureWidth;
+
+    std::vector<double> lossWeights;
+    lossWeights.resize(targetFeatureWidth);
+
     double totalLossWeight = 0.0;
     for (std::size_t index = 0;
-         index < model.contract.targetFeatureWidth;
+         index < targetFeatureWidth;
          ++index)
     {
-        totalLossWeight +=
+        lossWeights[index] =
             featureLossWeight(index, config);
+
+        totalLossWeight +=
+            lossWeights[index];
     }
 
     const auto normalizedDenominator =

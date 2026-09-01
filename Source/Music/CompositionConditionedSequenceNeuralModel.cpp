@@ -445,6 +445,9 @@ bool CompositionConditionedSequenceNeuralModel::predictNextEventInto(
             double sum =
                 hiddenBias[row];
 
+            const auto inputWeightBase =
+                row * width;
+
             const auto* inputWeight =
                 inputWeights.data() +
                 inputWeightBase;
