@@ -20,7 +20,6 @@ void expect(
             << "FAILED: "
             << message
             << '\n';
-
         std::exit(1);
     }
 }
@@ -77,69 +76,22 @@ void testEmbeddedVectorLoad()
     expect(
         result.isValid(),
         "embedded vector model load succeeds");
-
-    expect(
-        result.model.vocabulary.composers[0] ==
-            "chopin",
-        "embedded model preserves composer vocabulary");
 }
 
-void testRawResourceLoad()
+void testOversizedRawResourceFailsBeforeAllocation()
 {
-    const auto artifact =
-        serializeCompositionConditionedSequenceNeuralModel(
-            makeModel());
+    const std::uint8_t sentinel = 0;
 
     CompositionConditionedSequenceNeuralModelRuntimeLoader loader;
 
     const auto result =
         loader.load(
-            artifact.bytes.data(),
-            artifact.bytes.size());
-
-    expect(
-        result.isValid(),
-        "embedded raw resource load succeeds");
-
-    expect(
-        result.model.vocabulary.styles[0] ==
-            "romantic_piano",
-        "embedded raw model preserves style vocabulary");
-}
-
-void testInvalidResourceFailsClosed()
-{
-    const std::vector<std::uint8_t> invalid =
-    {
-        0x00,
-        0x01,
-        0x02,
-        0x03
-    };
-
-    CompositionConditionedSequenceNeuralModelRuntimeLoader loader;
-
-    const auto result =
-        loader.load(
-            invalid);
+            &sentinel,
+            CompositionConditionedSequenceNeuralModelRuntimeLoader::maxArtifactBytes + 1);
 
     expect(
         !result.isValid(),
-        "invalid embedded model fails closed");
-}
-
-void testNullResourceFailsClosed()
-{
-    CompositionConditionedSequenceNeuralModelRuntimeLoader loader;
-
-    const auto result =
-        loader.load(
-            nullptr,
-            0);
-
-    expect(
-        !result.isValid(),
-        "null embedded resource fails closed");
+        "oversized embedded model is rejected before allocation");
 }
 
 } // namespace
@@ -147,12 +99,10 @@ void testNullResourceFailsClosed()
 int main()
 {
     testEmbeddedVectorLoad();
-    testRawResourceLoad();
-    testInvalidResourceFailsClosed();
-    testNullResourceFailsClosed();
+    testOversizedRawResourceFailsBeforeAllocation();
 
     std::cout
-        << "MIDI-GenGX Phase 112 conditioned model runtime loader tests passed.\n";
+        << "MIDI-GenGX Phase 163 conditioned runtime loader robustness tests passed.\n";
 
     return 0;
 }

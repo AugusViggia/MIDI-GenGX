@@ -1,5 +1,3 @@
-#pragma once
-
 #include "CompositionConditionedSequenceNeuralModelArtifact.h"
 
 #include <cstddef>
@@ -23,6 +21,7 @@ class CompositionConditionedSequenceNeuralModelRuntimeLoader
 {
 public:
     static constexpr int version = 1;
+    static constexpr std::size_t maxArtifactBytes = 256u * 1024u * 1024u;
 
     CompositionConditionedSequenceNeuralModelRuntimeLoadResult
     load(
@@ -34,4 +33,4 @@ public:
         std::size_t size) const noexcept;
 };
 
-} // namespace midigengx::music
+} // namespace

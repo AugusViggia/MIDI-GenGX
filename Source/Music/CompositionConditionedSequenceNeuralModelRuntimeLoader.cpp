@@ -33,7 +33,8 @@ CompositionConditionedSequenceNeuralModelRuntimeLoader::load(
     CompositionConditionedSequenceNeuralModelRuntimeLoadResult result;
 
     if (data == nullptr ||
-        size == 0)
+        size == 0 ||
+        size > maxArtifactBytes)
     {
         return result;
     }
@@ -71,4 +72,4 @@ CompositionConditionedSequenceNeuralModelRuntimeLoader::load(
     return result;
 }
 
-} // namespace midigengx::music
+} // namespace
