@@ -67,14 +67,14 @@ bool CompositionMidiSequenceWindow::isValid(
     return true;
 }
 
-CompositionMidiSequenceWindow
-buildCompositionMidiSequenceWindow(
+bool buildCompositionMidiSequenceWindowInto(
     const CompositionMidiTrainingSequence& sequence,
     const CompositionSequenceLearningContract& contract,
-    const std::size_t targetIndex)
+    const std::size_t targetIndex,
+    CompositionMidiSequenceWindow& window)
     noexcept
 {
-    CompositionMidiSequenceWindow window;
+    window.valid = false;
 
     if (!sequence.isValid() ||
         !contract.isValid() ||
@@ -83,7 +83,7 @@ buildCompositionMidiSequenceWindow(
         targetIndex == 0 ||
         targetIndex >= sequence.events.size())
     {
-        return window;
+        return false;
     }
 
     const auto width =
@@ -98,16 +98,30 @@ buildCompositionMidiSequenceWindow(
     window.featureWidth =
         width;
 
-    window.inputs.assign(
-        contextLength * width,
+    window.inputs.resize(
+        contextLength * width);
+
+    std::fill(
+        window.inputs.begin(),
+        window.inputs.end(),
         0.0);
 
-    window.targets =
-        sequence.events[
-            targetIndex].features;
+    window.targets.resize(
+        width);
 
-    window.paddingMask.assign(
-        contextLength,
+    std::copy(
+        sequence.events[
+            targetIndex].features.begin(),
+        sequence.events[
+            targetIndex].features.end(),
+        window.targets.begin());
+
+    window.paddingMask.resize(
+        contextLength);
+
+    std::fill(
+        window.paddingMask.begin(),
+        window.paddingMask.end(),
         0.0);
 
     const auto firstContextIndex =
@@ -152,8 +166,24 @@ buildCompositionMidiSequenceWindow(
     window.valid =
         true;
 
-    if (!window.isValid(
-            contract))
+    return window.isValid(
+        contract);
+}
+
+CompositionMidiSequenceWindow
+buildCompositionMidiSequenceWindow(
+    const CompositionMidiTrainingSequence& sequence,
+    const CompositionSequenceLearningContract& contract,
+    const std::size_t targetIndex)
+    noexcept
+{
+    CompositionMidiSequenceWindow window;
+
+    if (!buildCompositionMidiSequenceWindowInto(
+            sequence,
+            contract,
+            targetIndex,
+            window))
     {
         return {};
     }

@@ -1,3 +1,4 @@
+============================================================
 #pragma once
 
 #include "CompositionMidiSequenceWindow.h"
@@ -44,6 +45,11 @@ struct CompositionConditionedSequenceNeuralModel
     bool initialized = false;
 
     bool isValid() const noexcept;
+
+    bool predictNextEventInto(
+        const CompositionMidiSequenceWindow& window,
+        const CompositionConditionedTrainingSample& sample,
+        CompositionConditionedSequenceNeuralPrediction& prediction) const noexcept;
 
     CompositionConditionedSequenceNeuralPrediction
     predictNextEvent(

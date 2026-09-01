@@ -24,6 +24,12 @@ struct CompositionMidiSequenceWindow
         const CompositionSequenceLearningContract& contract) const noexcept;
 };
 
+bool buildCompositionMidiSequenceWindowInto(
+    const CompositionMidiTrainingSequence& sequence,
+    const CompositionSequenceLearningContract& contract,
+    std::size_t targetIndex,
+    CompositionMidiSequenceWindow& window) noexcept;
+
 CompositionMidiSequenceWindow
 buildCompositionMidiSequenceWindow(
     const CompositionMidiTrainingSequence& sequence,
