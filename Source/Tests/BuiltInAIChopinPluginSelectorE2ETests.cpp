@@ -62,6 +62,21 @@ struct CapturedContext
     int syncopation = -1;
     int tension = -1;
     int repetition = -1;
+    int humanization = -1;
+    int noteLengthVariation = -1;
+    int cadenceStrength = -1;
+
+    int key = -1;
+    int scale = -1;
+    int role = -1;
+    int lengthBars = -1;
+    int octaveLow = -1;
+    int octaveHigh = -1;
+    int octaveShift = -1;
+
+    int noteLength = -1;
+    int phraseContour = -1;
+    int cadenceStyle = -1;
 };
 
 void testEmbeddedChopinModelIsLoadedAtConstruction()
@@ -113,15 +128,40 @@ void testRealPluginSelectorsReachAIProvider()
             captured.syncopation = context.parameters.syncopation;
             captured.tension = context.parameters.tension;
             captured.repetition = context.parameters.repetition;
+            captured.humanization = context.parameters.humanization;
+            captured.noteLengthVariation = context.parameters.noteLengthVariation;
+            captured.cadenceStrength = context.parameters.cadenceStrength;
+            captured.key = static_cast<int>(context.key);
+            captured.scale = static_cast<int>(context.scale.getType());
+            captured.role = static_cast<int>(context.role);
+            captured.lengthBars = context.parameters.lengthBars;
+            captured.octaveLow = context.parameters.octaveLow;
+            captured.octaveHigh = context.parameters.octaveHigh;
+            captured.octaveShift = context.parameters.octaveShift;
+            captured.noteLength = static_cast<int>(context.parameters.noteLength);
+            captured.phraseContour = static_cast<int>(context.parameters.phraseContour);
+            captured.cadenceStyle = static_cast<int>(context.parameters.cadenceStyle);
             return provider->generate(context, seed);
         });
 
+    processor.setKey(7);
+    processor.setScale(static_cast<int>(midigengx::domain::ScaleType::Major));
+    processor.setRole(static_cast<int>(midigengx::domain::Role::Piano));
+    processor.setLengthBars(12);
+    processor.setOctaveLow(-1);
+    processor.setOctaveHigh(3);
+    processor.setOctaveShift(1);
+
     processor.setDensity(11);
-    processor.setVariation(22);
-    processor.setComplexity(33);
-    processor.setSyncopation(44);
-    processor.setTension(55);
-    processor.setRepetition(66);
+    processor.setVariation(33);
+    processor.setComplexity(44);
+    processor.setSyncopation(55);
+    processor.setTension(66);
+    processor.setRepetition(77);
+    processor.setHumanization(88);
+    processor.setNoteLengthVariation(19);
+    processor.setCadenceStrength(91);
+
     processor.setAIRuntimeEnabled(true);
     processor.setGeneratorEnabled(true);
     processor.requestAIRuntimeGeneration();
@@ -129,13 +169,34 @@ void testRealPluginSelectorsReachAIProvider()
     waitForGenerationToSettle(processor);
 
     expect(captured.received, "AI provider receives plugin generation context");
+
     expect(captured.density == 11, "density reaches AI provider unchanged");
-    expect(captured.variation == 22, "variation reaches AI provider unchanged");
-    expect(captured.complexity == 33, "complexity reaches AI provider unchanged");
-    expect(captured.syncopation == 44, "syncopation reaches AI provider unchanged");
-    expect(captured.tension == 55, "tension reaches AI provider unchanged");
-    expect(captured.repetition == 66, "repetition reaches AI provider unchanged");
+    expect(captured.variation == 33, "variation reaches AI provider unchanged");
+    expect(captured.complexity == 44, "complexity reaches AI provider unchanged");
+    expect(captured.syncopation == 55, "syncopation reaches AI provider unchanged");
+    expect(captured.tension == 66, "tension reaches AI provider unchanged");
+    expect(captured.repetition == 77, "repetition reaches AI provider unchanged");
+    expect(captured.humanization == 88, "humanization reaches AI provider unchanged");
+    expect(captured.noteLengthVariation == 19, "note-length variation reaches AI provider unchanged");
+    expect(captured.cadenceStrength == 91, "cadence strength reaches AI provider unchanged");
+
+    expect(captured.key == 7, "key reaches AI provider unchanged");
+    expect(captured.scale == static_cast<int>(midigengx::domain::ScaleType::Major),
+           "scale reaches AI provider unchanged");
+    expect(captured.role == static_cast<int>(midigengx::domain::Role::Piano),
+           "role reaches AI provider unchanged");
+    expect(captured.lengthBars == 12, "length reaches AI provider unchanged");
+    expect(captured.octaveLow == -1, "octave low reaches AI provider unchanged");
+    expect(captured.octaveHigh == 3, "octave high reaches AI provider unchanged");
+    expect(captured.octaveShift == 1, "octave shift reaches AI provider unchanged");
+    expect(captured.noteLength == static_cast<int>(midigengx::domain::NoteLength::Auto),
+           "note length selector reaches AI provider unchanged");
+    expect(captured.phraseContour == static_cast<int>(midigengx::domain::PhraseContour::Arch),
+           "phrase contour selector reaches AI provider unchanged");
+    expect(captured.cadenceStyle == static_cast<int>(midigengx::domain::CadenceStyle::Root),
+           "cadence style selector reaches AI provider unchanged");
 }
+
 
 void testSelectorChangesTriggerNewAIRequest()
 {
@@ -167,6 +228,19 @@ void testSelectorChangesTriggerNewAIRequest()
             captured.syncopation = context.parameters.syncopation;
             captured.tension = context.parameters.tension;
             captured.repetition = context.parameters.repetition;
+            captured.humanization = context.parameters.humanization;
+            captured.noteLengthVariation = context.parameters.noteLengthVariation;
+            captured.cadenceStrength = context.parameters.cadenceStrength;
+            captured.key = static_cast<int>(context.key);
+            captured.scale = static_cast<int>(context.scale.getType());
+            captured.role = static_cast<int>(context.role);
+            captured.lengthBars = context.parameters.lengthBars;
+            captured.octaveLow = context.parameters.octaveLow;
+            captured.octaveHigh = context.parameters.octaveHigh;
+            captured.octaveShift = context.parameters.octaveShift;
+            captured.noteLength = static_cast<int>(context.parameters.noteLength);
+            captured.phraseContour = static_cast<int>(context.parameters.phraseContour);
+            captured.cadenceStyle = static_cast<int>(context.parameters.cadenceStyle);
             return provider->generate(context, seed);
         });
 

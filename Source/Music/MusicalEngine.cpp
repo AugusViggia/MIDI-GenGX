@@ -1,4 +1,3 @@
-
 #include "MusicalEngine.h"
 #include "MelodicContour.h"
 
@@ -670,34 +669,125 @@ Phrase MusicalEngine::generateWithAIGuidance(
                 (guidance.harmonyQualityTarget + 1.0) *
                 50.0));
 
-    guidedContext.parameters.tension =
-        std::clamp(
-            (guidedContext.parameters.tension +
-             tensionTarget) /
-                2,
+    // The learned model remains an interpreter of musical direction, but the
+    // explicit selector values are the user's requested targets. Keep the
+    // model influence deliberately soft so a prompt/model preference cannot
+    // silently override a selector.
+    const auto blendModelWithSelector = [](
+        int selectorPercent,
+        int modelPercent) noexcept
+    {
+        constexpr double modelInfluence = 0.20;
+        const auto value =
+            static_cast<double>(selectorPercent) +
+            (static_cast<double>(modelPercent - selectorPercent) *
+             modelInfluence);
+
+        return std::clamp(
+            static_cast<int>(std::lround(value)),
             0,
             100);
+    };
+
+    const auto toPercent = [](double normalized) noexcept
+    {
+        return std::clamp(
+            static_cast<int>(std::lround((normalized + 1.0) * 50.0)),
+            0,
+            100);
+    };
+
+    const auto selectorDensity = toPercent(guidance.densityTarget);
+    const auto selectorCatchiness = toPercent(guidance.catchinessTarget);
+    const auto selectorSyncopation = toPercent(guidance.syncopationTarget);
+    const auto selectorOctaveMovement = toPercent(guidance.octaveMovementTarget);
+    const auto selectorVariation = toPercent(guidance.variationTarget);
+    const auto selectorRepetition = toPercent(guidance.repetitionTarget);
+    const auto selectorTension = toPercent(guidance.tensionSelectorTarget);
+    const auto selectorComplexity = toPercent(guidance.complexityTarget);
+    const auto selectorHumanization = toPercent(guidance.humanizationTarget);
+    const auto selectorNoteLengthVariation = toPercent(guidance.noteLengthVariationTarget);
+    const auto selectorCadenceStrength =
+        std::clamp(
+            static_cast<int>(std::lround(guidance.cadenceStrengthTarget * 100.0)),
+            0,
+            100);
+
+    const auto modelTension =
+        tensionTarget;
+    const auto modelVariation =
+        tensionDeltaTarget;
+    const auto modelComplexity =
+        harmonyTarget;
+
+    guidedContext.parameters.density = selectorDensity;
+    guidedContext.parameters.catchiness = selectorCatchiness;
+    guidedContext.parameters.syncopation = selectorSyncopation;
+    guidedContext.parameters.octaveMovement = selectorOctaveMovement;
+    guidedContext.parameters.repetition = selectorRepetition;
+    guidedContext.parameters.humanization = selectorHumanization;
+    guidedContext.parameters.noteLengthVariation = selectorNoteLengthVariation;
+    guidedContext.parameters.cadenceStrength = selectorCadenceStrength;
+
+    guidedContext.parameters.tension =
+        blendModelWithSelector(
+            selectorTension,
+            modelTension);
 
     guidedContext.parameters.variation =
-        std::clamp(
-            (guidedContext.parameters.variation +
-             tensionDeltaTarget) /
-                2,
-            0,
-            100);
+        blendModelWithSelector(
+            selectorVariation,
+            modelVariation);
 
     guidedContext.parameters.complexity =
-        std::clamp(
-            (guidedContext.parameters.complexity +
-             harmonyTarget) /
-                2,
-            0,
-            100);
+        blendModelWithSelector(
+            selectorComplexity,
+            modelComplexity);
 
-    const auto generated =
+    auto generated =
         generate(
             guidedContext,
             seed);
+
+    // Length is a hard user constraint. AI-guided performance modifiers such
+    // as humanization may move the final note slightly past the requested end,
+    // so clamp note placement/duration without changing the requested phrase
+    // length or otherwise altering the generated musical content.
+    const double requestedLengthBeats =
+        static_cast<double>(guidedContext.parameters.lengthBars) *
+        beatsPerBar();
+
+    for (auto it = generated.notes.begin();
+         it != generated.notes.end();)
+    {
+        const double remaining =
+            requestedLengthBeats - it->startBeat;
+
+        if (remaining <= 0.0)
+        {
+            it = generated.notes.erase(it);
+            continue;
+        }
+
+        it->durationBeats =
+            std::min(it->durationBeats, remaining);
+
+        if (it->durationBeats <= 0.0)
+            it = generated.notes.erase(it);
+        else
+            ++it;
+    }
+
+    generated.lengthBeats =
+        requestedLengthBeats;
+
+    generated.normalize();
+
+    // normalize() intentionally expands a phrase when a note reaches beyond
+    // its declared length. All notes are already clipped above, so restore the
+    // exact user-requested structural length after normalization.
+    generated.lengthBeats =
+        requestedLengthBeats;
 
     return generated;
 }
@@ -1416,5 +1506,3 @@ Phrase MusicalEngine::generateLead(
 
 
 } // namespace midigengx::music
-
-

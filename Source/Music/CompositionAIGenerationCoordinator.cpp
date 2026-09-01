@@ -2,6 +2,15 @@
 
 namespace midigengx::music
 {
+namespace
+{
+
+double selectorToNormalized(int value) noexcept
+{
+    return (static_cast<double>(value) - 50.0) / 50.0;
+}
+
+} // namespace
 
 bool CompositionAIGenerationRequest::isValid(
     const CompositionLearningContract& contract) const noexcept
@@ -85,7 +94,7 @@ CompositionAIGenerationCoordinator::generate(
     if (!constraintResult.isValid())
         return result;
 
-    const auto guidance =
+    auto guidance =
         bridge.deriveGuidance(
             constraintResult.profile);
 
@@ -102,6 +111,23 @@ CompositionAIGenerationCoordinator::generate(
 
         return result;
     }
+
+    // Explicit selectors are copied into the AI guidance after model inference.
+    // This preserves the priority rule: the model interprets the requested
+    // musical direction, but the user's actual selector values remain explicit
+    // control targets rather than being inferred from the six learned outputs.
+    const auto& parameters = request.context.parameters;
+    guidance.densityTarget = selectorToNormalized(parameters.density);
+    guidance.catchinessTarget = selectorToNormalized(parameters.catchiness);
+    guidance.syncopationTarget = selectorToNormalized(parameters.syncopation);
+    guidance.octaveMovementTarget = selectorToNormalized(parameters.octaveMovement);
+    guidance.variationTarget = selectorToNormalized(parameters.variation);
+    guidance.repetitionTarget = selectorToNormalized(parameters.repetition);
+    guidance.tensionSelectorTarget = selectorToNormalized(parameters.tension);
+    guidance.complexityTarget = selectorToNormalized(parameters.complexity);
+    guidance.humanizationTarget = selectorToNormalized(parameters.humanization);
+    guidance.noteLengthVariationTarget = selectorToNormalized(parameters.noteLengthVariation);
+    guidance.cadenceStrengthTarget = static_cast<double>(parameters.cadenceStrength) / 100.0;
 
     result.phrase =
         engine.generateWithAIGuidance(

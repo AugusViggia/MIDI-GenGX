@@ -3224,3 +3224,32 @@ add_test(
     NAME MIDI_GenGX_BuiltInAIChopinPluginSelectorE2ETests
     COMMAND MIDI_GenGX_BuiltInAIChopinPluginSelectorE2ETests
 )
+
+
+# -------------------- Phase 126 semantic selector influence --------------------
+add_executable(MIDI_GenGX_CompositionAISelectorSemanticTests
+    Source/Tests/CompositionAISelectorSemanticTests.cpp
+)
+
+target_include_directories(
+    MIDI_GenGX_CompositionAISelectorSemanticTests
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/Source
+)
+
+target_link_libraries(
+    MIDI_GenGX_CompositionAISelectorSemanticTests
+    PRIVATE
+        MIDI_GenGX_Music
+)
+
+set_property(
+    TARGET MIDI_GenGX_CompositionAISelectorSemanticTests
+    PROPERTY
+        MSVC_RUNTIME_LIBRARY "MultiThreadedDebugDLL"
+)
+
+add_test(
+    NAME MIDI_GenGX_CompositionAISelectorSemanticTests
+    COMMAND MIDI_GenGX_CompositionAISelectorSemanticTests
+)

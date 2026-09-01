@@ -13,7 +13,18 @@ bool CompositionAIGuidance::isValid() const noexcept
         tensionDeltaTarget,
         harmonyDegreeTarget,
         harmonyQualityTarget,
-        harmonicDegreeDeltaTarget
+        harmonicDegreeDeltaTarget,
+        densityTarget,
+        catchinessTarget,
+        syncopationTarget,
+        octaveMovementTarget,
+        variationTarget,
+        repetitionTarget,
+        tensionSelectorTarget,
+        complexityTarget,
+        humanizationTarget,
+        noteLengthVariationTarget,
+        cadenceStrengthTarget
     };
 
     for (const auto value :
