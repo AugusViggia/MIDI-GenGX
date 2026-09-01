@@ -335,6 +335,76 @@ void testTrainingIsDeterministic()
 
 } // namespace
 
+
+void testKnowledgeAwareTrainingService()
+{
+    const auto dataset =
+        buildDataset();
+
+    expect(
+        dataset.isValid(),
+        "base conditioned dataset is valid");
+
+    CompositionKnowledgeTrainingDataset knowledgeDataset;
+    knowledgeDataset.featureWidth =
+        CompositionConditionedTrainingSample::knowledgeFeatureCount;
+    knowledgeDataset.verified = true;
+    knowledgeDataset.valid = true;
+
+    for (const auto& conditionedSample :
+         dataset.samples)
+    {
+        CompositionKnowledgeTrainingSample knowledgeSample;
+        knowledgeSample.sampleId =
+            conditionedSample.sequence.sampleId;
+        knowledgeSample.metadata =
+            conditionedSample.metadata;
+        knowledgeSample.sequence =
+            conditionedSample.sequence;
+
+        knowledgeSample.composerKnowledge.sampleId =
+            knowledgeSample.sampleId;
+        knowledgeSample.composerKnowledge.valid = true;
+        knowledgeSample.composerKnowledge.features.fill(0.25);
+
+        knowledgeSample.genreKnowledge.valid = true;
+        knowledgeSample.genreKnowledge.features.fill(0.50);
+
+        knowledgeSample.soundEngineeringKnowledge.valid = true;
+        knowledgeSample.soundEngineeringKnowledge.features.fill(0.50);
+
+        knowledgeSample.conditioningFeatures.fill(
+            conditionedSample.sequence.sampleId == "piece-a"
+                ? 0.25
+                : (conditionedSample.sequence.sampleId == "piece-b"
+                    ? 0.75
+                    : 0.50));
+
+        knowledgeSample.valid = true;
+
+        expect(
+            knowledgeSample.isValid(),
+            "knowledge sample fixture is valid");
+
+        knowledgeDataset.samples.push_back(
+            knowledgeSample);
+    }
+
+    const auto result =
+        trainCompositionConditionedSequenceNeuralModelFromDataset(
+            dataset,
+            knowledgeDataset,
+            config());
+
+    expect(
+        result.isValid(),
+        "knowledge-aware training service produces valid artifact");
+
+    expect(
+        result.training.windowCount > 0,
+        "knowledge-aware training creates windows");
+}
+
 int main()
 {
     testModelInitialization();
@@ -344,6 +414,8 @@ int main()
 
     std::cout
         << "MIDI-GenGX Phase 91 conditioned sequence neural trainer tests passed.\n";
+
+    testKnowledgeAwareTrainingService();
 
     return 0;
 }

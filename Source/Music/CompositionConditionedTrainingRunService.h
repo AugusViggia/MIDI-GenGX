@@ -4,6 +4,7 @@
 #include "CompositionMidiTrainingCorpusArtifact.h"
 #include "CompositionConditionedSequenceNeuralTrainingService.h"
 #include "CompositionSequenceMetadataArtifact.h"
+#include "CompositionKnowledgeTrainingDataset.h"
 
 namespace midigengx::music
 {
@@ -11,6 +12,7 @@ namespace midigengx::music
 struct CompositionConditionedTrainingRunResult
 {
     CompositionConditionedTrainingDatasetArtifact datasetArtifact;
+    CompositionKnowledgeTrainingDataset knowledgeDataset;
     CompositionConditionedSequenceNeuralTrainingResult training;
     CompositionConditionedSequenceNeuralModelArtifact modelArtifact;
 
