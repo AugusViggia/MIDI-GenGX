@@ -69,15 +69,11 @@ MIDIGenGXAudioProcessor::MIDIGenGXAudioProcessor()
     octaveLow.store(2);
     octaveHigh.store(4);
     octaveShift.store(0);
-
-    const juce::MemoryBlock builtInModel(
-        midigengx::music::built_in_ai_model::data(),
-        midigengx::music::built_in_ai_model::size());
-
-    if (loadAIRuntimeModel(builtInModel))
-        aiRuntimeGeneration.setEnabled(true);
-
-    generationWorker =
+    // Neural model runtime intentionally disabled until a formally
+    // validated local model is available. MusicalEngine remains the
+    // autonomous generation path.
+    aiRuntimeGeneration.setEnabled(false);
+generationWorker =
         std::make_unique<midigengx::generation::PhraseGenerationWorker>(
             [this]()
             {

@@ -1,6 +1,0 @@
-# sampleId	composerId	workId	movementId	styleId	eraId	instrumentationId	verified
-# Replace these rows with your real, verified corpus metadata.
-# The sampleId MUST exactly match the MIDI relative path with the extension removed.
-#
-# Example:
-# Chopin/Nocturne_Op9_No2	chopin	Nocturne_Op9_No2	movement-1	romantic_piano	romantic	solo_piano	1
